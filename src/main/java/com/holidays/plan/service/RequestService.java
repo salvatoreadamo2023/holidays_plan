@@ -26,14 +26,16 @@ public class RequestService {
     private final HolidayCalendar calendar;
     private final AccessPolicy policy;
     private final AuditService audit;
+    private final Notifier notifier;
     private final Clock clock;
 
     public RequestService(AbsenceRequestRepository requests, HolidayCalendar calendar, 
-                          AccessPolicy policy, AuditService audit, Clock clock) {
+                          AccessPolicy policy, AuditService audit, Notifier notifier, Clock clock) {
         this.requests = requests;
         this.calendar = calendar;
         this.policy = policy;
         this.audit = audit;
+        this.notifier = notifier;
         this.clock = clock;
     }
 
@@ -117,6 +119,7 @@ public class RequestService {
         r.setNote(blankToNull(in.note()));
         r = requests.save(r);
         audit.log(user.getId(), r.getId(), "CREATED", in.type() + " " + in.startDate() + " -> " + in.endDate());
+        notifier.created(r);
         return r;
     }
 
@@ -138,6 +141,7 @@ public class RequestService {
         r.setDecidedAt(Instant.now(clock));
         r.setDecisionNote(blankToNull(note));
         audit.log(actor.getId(), r.getId(), "APPROVED", note);
+        notifier.decided(r, true);
         return r;
     }
 
@@ -152,6 +156,7 @@ public class RequestService {
         r.setDecidedAt(Instant.now(clock));
         r.setDecisionNote(note.trim());
         audit.log(actor.getId(), r.getId(), "REJECTED", note);
+        notifier.decided(r, false);
         return r;
     }
 
@@ -175,6 +180,7 @@ public class RequestService {
         if (r.getEndDate().isBefore(LocalDate.now(clock))) throw ApiException.conflict("Il periodo e' gia' trascorso");
         r.setStatus(RequestStatus.CANCEL_REQUESTED);
         audit.log(actor.getId(), r.getId(), "CANCEL_REQUESTED", note);
+        notifier.cancelRequested(r);
         return r;
     }
 
@@ -188,6 +194,7 @@ public class RequestService {
         r.setDecidedAt(Instant.now(clock));
         if (blankToNull(note) != null) r.setDecisionNote(note.trim());
         audit.log(actor.getId(), r.getId(), accept ? "CANCELLED" : "CANCEL_DENIED", note);
+        notifier.cancelDecided(r, accept);
         return r;
     }
 

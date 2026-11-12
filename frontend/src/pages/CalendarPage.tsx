@@ -3,11 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { addMonths, endOfMonth, format, isToday, parseISO, startOfMonth } from 'date-fns'
 import { it } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Download, MousePointerClick } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, MousePointerClick } from 'lucide-react'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api, download } from '../lib/api'
-import { useAuth } from '../lib/auth'
+import { useAuth, isManager } from '../lib/auth'
 import { useUi } from '../lib/ui'
 import { iso, roleLabel, statusLabel, typeEmoji, typeLabel } from '../lib/format'
 import type { CalendarView } from '../lib/types'
@@ -81,6 +81,12 @@ export function CalendarPage() {
           </div>
           <Button onClick={() => { setDir(0); setMonth(startOfMonth(new Date())) }}>Oggi</Button>
           <Button onClick={() => download(`/api/calendar/export?${params}`, `assenze_${from}.csv`).catch(e => toast.error(e.message))}><Download size={16} /> Excel</Button>
+          {isManager(user) && (
+            <Button title="Riepilogo e dettaglio del mese per HR e paghe (solo assenze approvate)"
+              onClick={() => download(`/api/export/month?year=${month.getFullYear()}&month=${month.getMonth() + 1}`, `assenze_${format(month, 'yyyy-MM')}.xlsx`).catch(e => toast.error(e.message))}>
+              <FileSpreadsheet size={16} /> Report mese
+            </Button>
+          )}
         </div>
       </header>
 

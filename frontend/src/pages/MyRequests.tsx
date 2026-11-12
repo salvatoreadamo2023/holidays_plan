@@ -55,6 +55,7 @@ export function MyRequests() {
                     <span className="font-semibold">{typeLabel[r.type]}</span>
                     <span className="text-sm text-muted">· {num(r.amount)} {r.type === 'PERMESSO' ? 'ore' : 'giorni'}</span>
                     <StatusChip status={r.status} />
+                    {r.type === 'MALATTIA' && !(r.attachments ?? []).length && ['PENDING', 'APPROVED'].includes(r.status) && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-300">Certificato mancante</span>}
                   </div>
                   <div className="mt-0.5 text-sm">{range(r)}</div>
                   {r.note && <div className="mt-1 text-xs text-muted">“{r.note}”</div>}

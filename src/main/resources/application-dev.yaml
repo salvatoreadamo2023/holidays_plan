@@ -10,6 +10,8 @@ app:
   cors:
     allowed-origins: http://localhost:5173
   seed-demo-data: true
+  push:
+    enabled: false
 springdoc:
   api-docs:
     enabled: true

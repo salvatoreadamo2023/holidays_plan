@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
     List<AuditEvent> findByRequestIdOrderByCreatedAt(Long requestId);
+
+    List<AuditEvent> findTop300ByOrderByCreatedAtDesc();
 }

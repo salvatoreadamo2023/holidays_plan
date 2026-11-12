@@ -12,14 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.crypto.Mac;
-import javax.crypto.SecretKey;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Clock;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 
@@ -33,23 +27,20 @@ import java.util.Objects;
 public class AttachmentService {
     public static final long MAX_BYTES = 5L * 1024 * 1024;
     public static final int MAX_PER_REQUEST = 5;
-    static final long LINK_TTL_SECONDS = 300;
 
     private final AttachmentRepository attachments;
     private final AbsenceRequestRepository requests;
     private final AccessPolicy policy;
     private final AuditService audit;
-    private final SecretKey key;
-    private final Clock clock;
+    private final LinkSigner signer;
 
     public AttachmentService(AttachmentRepository attachments, AbsenceRequestRepository requests,
-                             AccessPolicy policy, AuditService audit, SecretKey jwtKey, Clock clock) {
+                             AccessPolicy policy, AuditService audit, LinkSigner signer) {
         this.attachments = attachments;
         this.requests = requests;
         this.policy = policy;
         this.audit = audit;
-        this.key = jwtKey;
-        this.clock = clock;
+        this.signer = signer;
     }
 
     public record SignedLink(String url, Instant expiresAt) {}
@@ -122,30 +113,16 @@ public class AttachmentService {
     public SignedLink link(User actor, Long attachmentId) {
         Attachment a = loadAttachment(attachmentId);
         checkCanSee(actor, a.getRequest());
-        long exp = Instant.now(clock).getEpochSecond() + LINK_TTL_SECONDS;
-        return new SignedLink("/api/files/" + a.getId() + "?exp=" + exp + "&sig=" + sign(a.getId(), exp),
+        long exp = signer.expiry();
+        return new SignedLink("/api/files/" + a.getId() + "?exp=" + exp + "&sig=" + signer.sign("attachment:" + a.getId(), exp),
             Instant.ofEpochSecond(exp));
     }
 
     /** Download tramite link firmato: non serve il login, la firma fa da permesso. */
     @Transactional(readOnly = true)
     public Attachment download(Long attachmentId, long exp, String sig) {
-        if (sig == null || exp < Instant.now(clock).getEpochSecond())
-            throw new ApiException(org.springframework.http.HttpStatus.GONE, "Link scaduto, riaprilo dall'app");
-        byte[] expected = sign(attachmentId, exp).getBytes(StandardCharsets.US_ASCII);
-        if (!MessageDigest.isEqual(expected, sig.getBytes(StandardCharsets.US_ASCII))) throw ApiException.notFound();
+        signer.verify("attachment:" + attachmentId, exp, sig);
         return loadAttachment(attachmentId);
-    }
-
-    private String sign(Long id, long exp) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(key);
-            byte[] out = mac.doFinal(("attachment:" + id + ":" + exp).getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(out);
-        } catch (Exception e) {
-            throw new IllegalStateException("Firma non disponibile", e);
-        }
     }
 
     private static AttachmentInfo info(Attachment a) {

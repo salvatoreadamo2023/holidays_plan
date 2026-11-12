@@ -290,4 +290,50 @@ class SecurityAndFlowTest {
             .andExpect(status().isOk());
         mvc.perform(get("/api/requests/mine").header("Authorization", tok)).andExpect(status().isOk());
     }
+
+    @Test
+    void exportMensile_adminEManager_userNo() throws Exception {
+        LocalDate d = freshMonday();
+        String q = "?year=" + d.getYear() + "&month=" + d.getMonthValue();
+        byte[] x = mvc.perform(get("/api/export/month" + q).header("Authorization", token("admin")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertThat(new String(x, 0, 2)).isEqualTo("PK");
+        mvc.perform(get("/api/export/month" + q).header("Authorization", token("user"))).andExpect(status().isForbidden());
+        String url = json.readTree(mvc.perform(get("/api/export/month/link" + q).header("Authorization", token("pm2")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("url").asText();
+        mvc.perform(get(url)).andExpect(status().isOk());
+        mvc.perform(get(url.replace("uid=", "uid=1"))).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void storicoSoloAdmin() throws Exception {
+        mvc.perform(get("/api/admin/audit").header("Authorization", token("admin"))).andExpect(status().isOk());
+        mvc.perform(get("/api/admin/audit").header("Authorization", token("pm"))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void registrazioneTelefono() throws Exception {
+        String t = token("user");
+        mvc.perform(post("/api/devices").header("Authorization", t).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"token\":\"ExponentPushToken[abcdefghij123456]\",\"platform\":\"android\"}")).andExpect(status().isNoContent());
+        mvc.perform(post("/api/devices").header("Authorization", t).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"token\":\"nonvalido\"}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/devices/remove").header("Authorization", t).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"token\":\"ExponentPushToken[abcdefghij123456]\"}")).andExpect(status().isNoContent());
+    }
+
+    @Autowired com.holidays.plan.service.CertificateReminder reminder;
+
+    @Test
+    void promemoriaCertificato_soloMalattieVecchieSenzaAllegato() throws Exception {
+        // Le malattie appena create non vanno sollecitate
+        LocalDate d = LocalDate.now().minusDays(3);
+        while (d.getDayOfWeek().getValue() > 5) d = d.minusDays(1);
+        mvc.perform(post("/api/requests").header("Authorization", token("sara")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "MALATTIA", "startDate", d.toString(), "endDate", d.toString()))))
+            .andExpect(status().isCreated());
+        assertThat(reminder.run()).isGreaterThanOrEqualTo(0);
+        int again = reminder.run();
+        assertThat(again).isZero();
+    }
 }

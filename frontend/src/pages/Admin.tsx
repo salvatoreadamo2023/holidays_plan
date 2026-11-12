@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Building2, CalendarHeart, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
+import { Building2, CalendarHeart, History, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
@@ -14,6 +14,7 @@ const tabs = [
   { key: 'areas', label: 'Aree', icon: Building2 },
   { key: 'teams', label: 'Team', icon: UsersRound },
   { key: 'holidays', label: 'Festività', icon: CalendarHeart },
+  { key: 'audit', label: 'Storico', icon: History },
 ] as const
 type Tab = typeof tabs[number]['key']
 
@@ -39,6 +40,7 @@ export function Admin() {
       {tab === 'areas' && <AreasTab />}
       {tab === 'teams' && <TeamsTab />}
       {tab === 'holidays' && <HolidaysTab />}
+      {tab === 'audit' && <AuditTab />}
     </div>
   )
 }
@@ -265,5 +267,39 @@ function HolidaysTab() {
         </form>
       </Card>
     </div>
+  )
+}
+
+type AuditRow = { id: number; createdAt: string; action: string; actorName: string; requestId: number | null; ownerName: string | null; requestType: string | null; startDate: string | null; endDate: string | null; detail: string | null }
+export const auditLabel: Record<string, string> = {
+  CREATED: 'ha creato una richiesta', APPROVED: 'ha approvato', REJECTED: 'ha rifiutato', WITHDRAWN: 'ha ritirato',
+  CANCEL_REQUESTED: "ha chiesto l'annullamento", CANCELLED: "ha confermato l'annullamento", CANCEL_DENIED: "ha respinto l'annullamento",
+  ATTACHMENT_ADDED: 'ha allegato un file', ATTACHMENT_REMOVED: 'ha tolto un allegato', CERTIFICATE_REMINDER: 'promemoria certificato inviato',
+  USER_CREATED: 'ha creato un utente', USER_UPDATED: 'ha modificato un utente', PASSWORD_RESET: 'ha reimpostato una password',
+}
+
+function AuditTab() {
+  const q = useQuery({ queryKey: ['admin', 'audit'], queryFn: () => api<AuditRow[]>('/api/admin/audit') })
+  const [s, setS] = useState('')
+  const list = (q.data ?? []).filter(e => !s || `${e.actorName} ${e.ownerName ?? ''} ${e.detail ?? ''} ${auditLabel[e.action] ?? e.action}`.toLowerCase().includes(s.toLowerCase()))
+  return (
+    <Card>
+      <div className="mb-4 flex items-center gap-3">
+        <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input className={`${inputCls} pl-9`} placeholder="Cerca persona o azione" value={s} onChange={e => setS(e.target.value)} /></div>
+        <span className="text-xs text-muted">Ultime 300 operazioni</span>
+      </div>
+      <ul className="divide-y divide-[var(--border)]">
+        {list.map(e => (
+          <li key={e.id} className="flex flex-wrap items-baseline gap-x-2 py-2.5 text-sm">
+            <span className="w-32 shrink-0 text-xs text-muted">{fmt(e.createdAt, 'd MMM HH:mm')}</span>
+            <span className="font-semibold">{e.actorName}</span>
+            <span>{auditLabel[e.action] ?? e.action}</span>
+            {e.ownerName && e.ownerName !== e.actorName && <span className="text-muted">di {e.ownerName}</span>}
+            {e.requestType && e.startDate && <span className="text-muted">· {e.requestType.toLowerCase()} {fmt(e.startDate, 'd MMM')}{e.endDate && e.endDate !== e.startDate ? ` → ${fmt(e.endDate, 'd MMM')}` : ''}</span>}
+            {e.detail && !e.requestType && <span className="text-muted">· {e.detail}</span>}
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }
