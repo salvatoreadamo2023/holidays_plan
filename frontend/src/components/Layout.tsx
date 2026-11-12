@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { useEffect } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarRange, CheckCheck, Command, Home, ListChecks, LogOut, Moon, Plus, Settings, Sun } from 'lucide-react'
@@ -32,6 +33,10 @@ export function Layout() {
   const { user, logout } = useAuth()
   const { openRequest, setPaletteOpen, dark, toggleDark } = useUi()
   const loc = useLocation()
+  const nav = useNavigate()
+  useEffect(() => {
+    if (new URLSearchParams(loc.search).has('nuova')) { openRequest(); nav('/', { replace: true }) }
+  }, [loc.search, openRequest, nav])
   const toApprove = useQuery({
     queryKey: ['to-approve'],
     queryFn: () => api<RequestView[]>('/api/requests/to-approve'),
@@ -104,7 +109,7 @@ export function Layout() {
       </main>
 
       {/* Navigazione mobile */}
-      <nav className="glass-strong fixed inset-x-3 bottom-3 z-30 flex items-center justify-around rounded-2xl px-2 py-2 lg:hidden">
+      <nav className="glass-strong fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] z-30 flex items-center justify-around rounded-2xl px-2 py-2 lg:hidden">
         {links.slice(0, 2).map(l => (
           <NavLink key={l.to} to={l.to} end={l.end} className={({ isActive }) => clsx('flex flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 text-[10px] font-medium', isActive ? 'text-violet-500' : 'text-muted')}>
             <l.icon size={20} />{l.label}
