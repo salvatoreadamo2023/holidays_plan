@@ -64,14 +64,17 @@ public class AuthController {
     @GetMapping("/me")
     @Transactional(readOnly = true)
     public UserSummary me() {
-        return UserSummary.of(currentUser.get());
+        return UserSummary.of(currentUser.getAllowingPasswordChange());
     }
 
     @PostMapping("/password")
     @Transactional
     public void changePassword(@Valid @RequestBody ChangePassword in) {
-        User u = currentUser.get();
+        User u = currentUser.getAllowingPasswordChange();
         if (!encoder.matches(in.currentPassword(), u.getPasswordHash())) throw ApiException.bad("Password attuale errata");
+        if (encoder.matches(in.newPassword(), u.getPasswordHash())) throw ApiException.bad("La nuova password deve essere diversa da quella attuale");
         u.setPasswordHash(encoder.encode(in.newPassword()));
+        u.setMustChangePassword(false);
+        users.save(u);
     }
 }

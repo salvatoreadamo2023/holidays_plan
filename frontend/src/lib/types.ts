@@ -5,6 +5,7 @@ export type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN' | 'CANCEL
 export interface UserSummary {
   id: number; fullName: string; username: string; role: Role
   areaId: number | null; areaName: string | null; teamId: number | null; teamName: string | null
+  mustChangePassword: boolean
 }
 
 export interface RequestView {

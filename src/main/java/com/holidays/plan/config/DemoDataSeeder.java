@@ -50,6 +50,9 @@ public class DemoDataSeeder implements ApplicationRunner {
         u.setRole(role);
         u.setArea(area);
         u.setTeam(team);
+        // Solo dati demo: in produzione i saldi partono da zero e li carica l'admin.
+        u.setAnnualLeaveDays(new BigDecimal("26"));
+        u.setAnnualPermitHours(new BigDecimal("32"));
         return users.save(u);
     }
 

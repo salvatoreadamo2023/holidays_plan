@@ -17,7 +17,17 @@ public class CurrentUser {
         this.users = users;
     }
 
+    /** Utente corrente; se deve ancora cambiare la password, blocca ogni operazione tranne il cambio. */
     public User get() {
+        User u = getAllowingPasswordChange();
+        if (u.isMustChangePassword()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Devi cambiare la password prima di continuare");
+        }
+        return u;
+    }
+
+    /** Per /auth/me e /auth/password: consentiti anche se la password va cambiata. */
+    public User getAllowingPasswordChange() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Sessione non valida");

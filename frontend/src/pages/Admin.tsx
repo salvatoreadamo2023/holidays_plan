@@ -51,7 +51,7 @@ const useOrg = () => {
 }
 
 type UserForm = Omit<UserAdmin, 'id' | 'areaName' | 'teamName'> & { id?: number; password: string }
-const emptyUser: UserForm = { username: '', email: '', fullName: '', role: 'USER', areaId: null, teamId: null, active: true, annualLeaveDays: 26, annualPermitHours: 32, password: '' }
+const emptyUser: UserForm = { username: '', email: '', fullName: '', role: 'USER', areaId: null, teamId: null, active: true, annualLeaveDays: 0, annualPermitHours: 0, password: '' }
 
 function UsersTab() {
   const { users, areas, teams } = useOrg()

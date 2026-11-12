@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarRange, CheckCheck, Command, Home, ListChecks, LogOut, Moon, Plus, Settings, Sun } from 'lucide-react'
+import { CalendarRange, CheckCheck, Command, Home, KeyRound, ListChecks, LogOut, Moon, Plus, Settings, Sun } from 'lucide-react'
 import clsx from 'clsx'
 import { isAdmin, isManager, useAuth } from '../lib/auth'
 import { useUi } from '../lib/ui'
@@ -87,6 +87,7 @@ export function Layout() {
             <div className="truncate text-[11px] text-muted">{user && roleLabel[user.role]}{user?.areaName ? ` · ${user.areaName}` : ''}</div>
           </div>
           <button onClick={toggleDark} className="rounded-lg p-1.5 text-muted hover:text-[var(--text)]" aria-label="Cambia tema">{dark ? <Sun size={16} /> : <Moon size={16} />}</button>
+          <Link to="/password" className="rounded-lg p-1.5 text-muted hover:text-[var(--text)]" aria-label="Cambia password" title="Cambia password"><KeyRound size={16} /></Link>
           <button onClick={logout} className="rounded-lg p-1.5 text-muted hover:text-rose-500" aria-label="Esci"><LogOut size={16} /></button>
         </div>
       </aside>
@@ -96,6 +97,7 @@ export function Layout() {
         <Logo />
         <div className="flex items-center gap-1">
           <button onClick={toggleDark} className="rounded-lg p-2" aria-label="Cambia tema">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
+          <Link to="/password" className="rounded-lg p-2" aria-label="Cambia password"><KeyRound size={18} /></Link>
           <button onClick={logout} className="rounded-lg p-2" aria-label="Esci"><LogOut size={18} /></button>
         </div>
       </header>

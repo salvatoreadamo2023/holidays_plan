@@ -12,12 +12,12 @@ public final class AdminDtos {
 
     public record UserAdminView(Long id, String username, String email, String fullName, Role role,
                                 Long areaId, String areaName, Long teamId, String teamName, boolean active,
-                                BigDecimal annualLeaveDays, BigDecimal annualPermitHours) {
+                                BigDecimal annualLeaveDays, BigDecimal annualPermitHours, boolean mustChangePassword) {
         public static UserAdminView of(User u) {
             return new UserAdminView(u.getId(), u.getUsername(), u.getEmail(), u.getFullName(), u.getRole(),
                 u.areaId(), u.getArea() == null ? null : u.getArea().getName(),
                 u.teamId(), u.getTeam() == null ? null : u.getTeam().getName(), u.isActive(),
-                u.getAnnualLeaveDays(), u.getAnnualPermitHours());
+                u.getAnnualLeaveDays(), u.getAnnualPermitHours(), u.isMustChangePassword());
         }
     }
 
@@ -29,8 +29,8 @@ public final class AdminDtos {
         @NotNull Role role,
         Long areaId,
         Long teamId,
-        @NotNull @DecimalMin("0") @DecimalMax("60") BigDecimal annualLeaveDays,
-        @NotNull @DecimalMin("0") @DecimalMax("400") BigDecimal annualPermitHours) {}
+        @DecimalMin("0") @DecimalMax("60") BigDecimal annualLeaveDays,
+        @DecimalMin("0") @DecimalMax("400") BigDecimal annualPermitHours) {}
 
     public record UserUpdate(
         @NotBlank @Email @Size(max = 180) String email,

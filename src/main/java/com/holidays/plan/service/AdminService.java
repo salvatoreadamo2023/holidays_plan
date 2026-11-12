@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -61,8 +62,9 @@ public class AdminService {
         u.setEmail(in.email().trim());
         u.setFullName(in.fullName().trim());
         u.setPasswordHash(encoder.encode(in.password()));
-        u.setAnnualLeaveDays(in.annualLeaveDays());
-        u.setAnnualPermitHours(in.annualPermitHours());
+        u.setMustChangePassword(true);
+        u.setAnnualLeaveDays(in.annualLeaveDays() == null ? BigDecimal.ZERO : in.annualLeaveDays());
+        u.setAnnualPermitHours(in.annualPermitHours() == null ? BigDecimal.ZERO : in.annualPermitHours());
         applyOrg(u, in.role(), in.areaId(), in.teamId());
         u = users.save(u);
         audit.log(actor.getId(), null, "USER_CREATED", u.getUsername() + " " + u.getRole());
@@ -81,7 +83,11 @@ public class AdminService {
         u.setAnnualLeaveDays(in.annualLeaveDays());
         u.setAnnualPermitHours(in.annualPermitHours());
         applyOrg(u, in.role(), in.areaId(), in.teamId());
-        if (in.newPassword() != null && !in.newPassword().isBlank()) u.setPasswordHash(encoder.encode(in.newPassword()));
+        if (in.newPassword() != null && !in.newPassword().isBlank()) {
+            u.setPasswordHash(encoder.encode(in.newPassword()));
+            u.setMustChangePassword(true);
+            audit.log(actor.getId(), null, "PASSWORD_RESET", u.getUsername());
+        }
         audit.log(actor.getId(), null, "USER_UPDATED", u.getUsername() + " " + u.getRole() + " active=" + u.isActive());
         return UserAdminView.of(u);
     }

@@ -53,6 +53,7 @@ public class FirstAdminBootstrap implements ApplicationRunner {
         u.setFullName("Amministratore");
         u.setPasswordHash(encoder.encode(password));
         u.setRole(Role.ADMIN);
+        u.setMustChangePassword(true);
         users.save(u);
         log.warn("Creato il primo Admin '{}'. Crea il tuo utente personale e disattiva questo.", username);
     }

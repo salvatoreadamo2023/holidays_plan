@@ -76,7 +76,7 @@ class SecurityAndFlowTest {
     void nessunaPasswordNelleRisposte() throws Exception {
         String body = mvc.perform(get("/api/admin/users").header("Authorization", token("admin")))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        assertThat(body.toLowerCase()).doesNotContain("password").doesNotContain("$2a$");
+        assertThat(body.toLowerCase()).doesNotContain("\"password\"").doesNotContain("passwordhash").doesNotContain("$2a$");
     }
 
     @Test
@@ -197,5 +197,27 @@ class SecurityAndFlowTest {
         assertThat(body).doesNotContain("Sviluppo");
         mvc.perform(get("/api/requests/to-approve").header("Authorization", token("user")))
             .andExpect(status().isOk()).andExpect(content().json("[]"));
+    }
+
+    @Test
+    void nuovoUtenteDeveCambiarePasswordESaldoAZero() throws Exception {
+        String admin = token("admin");
+        String body = json.writeValueAsString(Map.of("username", "nuovo.utente", "email", "nuovo@example.com",
+            "fullName", "Nuovo Utente", "password", "Iniziale-2026!", "role", "USER", "areaId", 1));
+        String created = mvc.perform(post("/api/admin/users").header("Authorization", admin).contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        assertThat(json.readTree(created).get("annualLeaveDays").decimalValue().signum()).isZero();
+        MvcResult r = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("username", "nuovo.utente", "password", "Iniziale-2026!"))))
+            .andExpect(status().isOk()).andReturn();
+        var login = json.readTree(r.getResponse().getContentAsString());
+        assertThat(login.get("user").get("mustChangePassword").asBoolean()).isTrue();
+        String tok = "Bearer " + login.get("token").asText();
+        mvc.perform(get("/api/requests/mine").header("Authorization", tok)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/auth/me").header("Authorization", tok)).andExpect(status().isOk());
+        mvc.perform(post("/api/auth/password").header("Authorization", tok).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("currentPassword", "Iniziale-2026!", "newPassword", "Personale-2026!"))))
+            .andExpect(status().isOk());
+        mvc.perform(get("/api/requests/mine").header("Authorization", tok)).andExpect(status().isOk());
     }
 }

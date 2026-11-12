@@ -8,6 +8,7 @@ import { AuthProvider, isAdmin, isManager, useAuth } from './lib/auth'
 import { UiProvider, useUi } from './lib/ui'
 import { Layout } from './components/Layout'
 import { Login } from './pages/Login'
+import { ChangePassword } from './pages/ChangePassword'
 import { Dashboard } from './pages/Dashboard'
 import { CalendarPage } from './pages/CalendarPage'
 import { MyRequests } from './pages/MyRequests'
@@ -23,12 +24,13 @@ function AppRoutes() {
   return (
     <>
       <Toaster theme={dark ? 'dark' : 'light'} position="top-right" richColors closeButton />
-      {!user ? <Login /> : (
+      {!user ? <Login /> : user.mustChangePassword ? <ChangePassword forced /> : (
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="calendario" element={<CalendarPage />} />
             <Route path="richieste" element={<MyRequests />} />
+            <Route path="password" element={<ChangePassword />} />
             {isManager(user) && <Route path="approvazioni" element={<Approvals />} />}
             {isAdmin(user) && <Route path="admin" element={<Admin />} />}
             <Route path="*" element={<Navigate to="/" replace />} />

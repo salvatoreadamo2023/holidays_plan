@@ -44,10 +44,13 @@ public class User {
     private boolean active = true;
 
     @Column(name = "annual_leave_days", nullable = false, precision = 5, scale = 1)
-    private BigDecimal annualLeaveDays = new BigDecimal("26");
+    private BigDecimal annualLeaveDays = BigDecimal.ZERO;
 
     @Column(name = "annual_permit_hours", nullable = false, precision = 6, scale = 1)
-    private BigDecimal annualPermitHours = new BigDecimal("32");
+    private BigDecimal annualPermitHours = BigDecimal.ZERO;
+
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();

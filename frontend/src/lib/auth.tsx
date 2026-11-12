@@ -8,6 +8,7 @@ interface AuthCtx {
   loading: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => void
+  refresh: () => Promise<void>
 }
 
 const Ctx = createContext<AuthCtx | null>(null)
@@ -31,7 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(r.user)
   }, [])
 
-  return <Ctx.Provider value={{ user, loading, login, logout }}>{children}</Ctx.Provider>
+  const refresh = useCallback(async () => { setUser(await api<UserSummary>('/api/auth/me')) }, [])
+
+  return <Ctx.Provider value={{ user, loading, login, logout, refresh }}>{children}</Ctx.Provider>
 }
 
 export function useAuth() {
