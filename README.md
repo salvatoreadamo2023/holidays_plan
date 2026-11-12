@@ -34,7 +34,7 @@ Test: `mvn test` (regole di permesso, flusso approvazioni, saldo, festività).
 ```bash
 docker build -t holidays-plan .
 docker run -p 8080:8080 \
-  -e DB_URL=jdbc:mysql://host:3306/ferie -e DB_USER=... -e DB_PASSWORD=... \
+  -e DB_URL=jdbc:postgresql://host:5432/ferie -e DB_USER=... -e DB_PASSWORD=... \
   -e JWT_SECRET=<almeno 32 caratteri casuali> \
   holidays-plan
 ```
@@ -49,4 +49,4 @@ INSERT INTO users (username, email, full_name, password_hash, role, active, annu
 VALUES ('admin', 'admin@azienda.it', 'Amministratore', '<hash bcrypt>', 'ADMIN', TRUE, 26, 32);
 ```
 
-L'immagine Docker è portabile: gira uguale su Render, AWS (ECS/App Runner + RDS MySQL) o GCP (Cloud Run + Cloud SQL).
+L'immagine Docker è portabile: gira uguale su Render, AWS (ECS/App Runner + RDS PostgreSQL) o GCP (Cloud Run + Cloud SQL).
