@@ -7,6 +7,7 @@ import com.holidays.plan.service.CalendarService;
 import com.holidays.plan.service.RequestService;
 import com.holidays.plan.web.dto.BalanceView;
 import com.holidays.plan.web.dto.CalendarView;
+import com.holidays.plan.web.dto.TrendView;
 import com.holidays.plan.web.dto.RequestDtos.RequestView;
 import com.holidays.plan.web.dto.UserSummary;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -30,9 +31,11 @@ public class CalendarController {
     private final BalanceService balances;
     private final RequestService requests;
     private final CurrentUser currentUser;
+    private final RequestViewer views;
 
     public CalendarController(CalendarService calendar, BalanceService balances, RequestService requests,
-                              CurrentUser currentUser) {
+                              CurrentUser currentUser, RequestViewer views) {
+        this.views = views;
         this.calendar = calendar;
         this.balances = balances;
         this.requests = requests;
@@ -81,7 +84,8 @@ public class CalendarController {
         return "\"" + v + "\"";
     }
 
-    public record Dashboard(UserSummary me, BalanceView balance, List<RequestView> upcoming,
+    /** balance resta per le versioni vecchie dell'app; le nuove usano trend. */
+    public record Dashboard(UserSummary me, BalanceView balance, TrendView trend, List<RequestView> upcoming,
                             int toApprove, List<String> absentToday) {}
 
     @GetMapping("/dashboard")
@@ -89,13 +93,20 @@ public class CalendarController {
     public Dashboard dashboard() {
         User u = currentUser.get();
         LocalDate today = LocalDate.now();
-        List<RequestView> upcoming = requests.mine(u).stream()
+        List<RequestView> upcoming = views.many(requests.mine(u).stream()
             .filter(r -> !r.getEndDate().isBefore(today))
             .filter(r -> r.getStatus().name().matches("PENDING|APPROVED|CANCEL_REQUESTED"))
             .sorted((a, b) -> a.getStartDate().compareTo(b.getStartDate()))
-            .limit(5).map(RequestView::of).toList();
-        return new Dashboard(UserSummary.of(u), balances.balance(u, today.getYear()), upcoming,
+            .limit(5).toList());
+        return new Dashboard(UserSummary.of(u), balances.balance(u, today.getYear()),
+            balances.trend(u, today.getYear()), upcoming,
             requests.toDecide(u).size(), calendar.absentToday(u));
+    }
+
+    @GetMapping("/trend")
+    @Transactional(readOnly = true)
+    public TrendView trend(@RequestParam(required = false) Integer year) {
+        return balances.trend(currentUser.get(), year == null ? LocalDate.now().getYear() : year);
     }
 
     @GetMapping("/balance")

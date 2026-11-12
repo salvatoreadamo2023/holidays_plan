@@ -5,9 +5,11 @@ import com.holidays.plan.domain.RequestStatus;
 import com.holidays.plan.domain.User;
 import com.holidays.plan.repo.AbsenceRequestRepository;
 import com.holidays.plan.web.dto.BalanceView;
+import com.holidays.plan.web.dto.TrendView;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.EnumSet;
 
@@ -41,5 +43,20 @@ public class BalanceService {
             u.getAnnualPermitHours(), permitUsed, permitPending,
             u.getAnnualPermitHours().subtract(permitUsed).subtract(permitPending),
             sick);
+    }
+
+    private static final BigDecimal HOURS_PER_DAY = new BigDecimal("8");
+
+    public TrendView trend(User u, int year) {
+        EnumSet<RequestStatus> active = EnumSet.copyOf(RequestStatus.ACTIVE);
+        EnumSet<RequestStatus> pending = EnumSet.of(RequestStatus.PENDING);
+        BigDecimal leave = sum(u, AbsenceType.FERIE, active, year);
+        BigDecimal permit = sum(u, AbsenceType.PERMESSO, active, year);
+        BigDecimal sick = sum(u, AbsenceType.MALATTIA, active, year);
+        BigDecimal total = leave.add(sick).add(permit.divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP));
+        return new TrendView(year,
+            leave, sum(u, AbsenceType.FERIE, pending, year),
+            permit, sum(u, AbsenceType.PERMESSO, pending, year),
+            sick, total);
     }
 }

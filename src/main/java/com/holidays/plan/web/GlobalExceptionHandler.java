@@ -63,6 +63,18 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Dato duplicato o in uso");
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ProblemDetail tooBig(Exception e) {
+        return problem(HttpStatus.PAYLOAD_TOO_LARGE, "Il file supera i 5 MB");
+    }
+
+    @ExceptionHandler({org.springframework.web.multipart.support.MissingServletRequestPartException.class,
+        org.springframework.web.multipart.MultipartException.class,
+        org.springframework.web.bind.MissingServletRequestParameterException.class})
+    ProblemDetail missingPart(Exception e) {
+        return problem(HttpStatus.BAD_REQUEST, "Dati non validi");
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     ProblemDetail notFound(NoResourceFoundException e) {
         return problem(HttpStatus.NOT_FOUND, "Non trovato");

@@ -39,8 +39,8 @@ public final class AdminDtos {
         Long areaId,
         Long teamId,
         boolean active,
-        @NotNull @DecimalMin("0") @DecimalMax("60") BigDecimal annualLeaveDays,
-        @NotNull @DecimalMin("0") @DecimalMax("400") BigDecimal annualPermitHours,
+        @DecimalMin("0") @DecimalMax("60") BigDecimal annualLeaveDays,
+        @DecimalMin("0") @DecimalMax("400") BigDecimal annualPermitHours,
         @Size(min = 10, max = 200) String newPassword) {}
 
     public record AreaInput(@NotBlank @Size(max = 100) String name, Long managerId) {}

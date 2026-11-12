@@ -9,6 +9,7 @@ import { iso, num, typeEmoji, typeLabel } from '../lib/format'
 import type { AbsenceType, CreateRequest, Preview } from '../lib/types'
 import { useUi } from '../lib/ui'
 import { Avatar, Button, Field, inputCls, Modal } from './ui'
+import { ACCEPT, MAX_MB, uploadAttachment } from './Attachments'
 
 const types: AbsenceType[] = ['FERIE', 'PERMESSO', 'MALATTIA']
 
@@ -43,8 +44,17 @@ export function NewRequestDrawer() {
     retry: false,
   })
 
+  const [file, setFile] = useState<File | null>(null)
+  useEffect(() => { if (requestOpen) setFile(null) }, [requestOpen])
   const create = useMutation({
-    mutationFn: () => api('/api/requests', { method: 'POST', json: payload }),
+    mutationFn: async () => {
+      const r = await api<{ id: number }>('/api/requests', { method: 'POST', json: payload })
+      if (file) {
+        try { await uploadAttachment(r.id, file) }
+        catch (e) { toast.error(`Richiesta inviata, ma l'allegato non è stato caricato: ${(e as Error).message}`) }
+      }
+      return r
+    },
     onSuccess: () => {
       toast.success('Richiesta inviata', { description: 'Il tuo responsabile riceverà la notifica.' })
       qc.invalidateQueries(); closeRequest()
@@ -121,14 +131,8 @@ export function NewRequestDrawer() {
               <div className="flex items-end gap-6">
                 <div>
                   <div className="font-display text-4xl font-bold">{num(p.amount)}</div>
-                  <div className="text-xs text-muted">{p.unit} {form.type === 'MALATTIA' ? 'lavorativi' : 'da scalare'}</div>
+                  <div className="text-xs text-muted">{p.unit} {form.type === 'PERMESSO' ? '' : 'lavorativi'}</div>
                 </div>
-                {p.availableAfter != null && (
-                  <div>
-                    <div className={clsx('font-display text-2xl font-semibold', p.availableAfter < 0 && 'text-rose-500')}>{num(p.availableAfter)}</div>
-                    <div className="text-xs text-muted">{p.unit} rimanenti dopo</div>
-                  </div>
-                )}
               </div>
               {p.warnings.map(w => (
                 <p key={w} className="mt-3 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-300"><AlertTriangle size={15} /> {w}</p>
@@ -144,6 +148,10 @@ export function NewRequestDrawer() {
             <motion.div key="loading" className="flex items-center gap-2 text-sm text-muted"><CalendarDays size={16} /> Calcolo in corso…</motion.div>
           )}
         </AnimatePresence>
+
+        <Field label="Allegato (facoltativo)" hint={`Certificato o giustificativo: PDF, JPG o PNG fino a ${MAX_MB} MB. Puoi aggiungerlo anche dopo da Le mie richieste.`}>
+          <input type="file" accept={ACCEPT} className={clsx(inputCls, 'py-2 text-sm')} onChange={e => setFile(e.target.files?.[0] ?? null)} />
+        </Field>
 
         <Button variant="primary" className="w-full py-3.5 text-base" disabled={create.isPending || !!err || !p || p.warnings.length > 0}
           onClick={() => create.mutate()}>

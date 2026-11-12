@@ -30,12 +30,16 @@ public final class RequestDtos {
     public record RequestView(Long id, UserSummary user, AbsenceType type, RequestStatus status,
                               LocalDate startDate, LocalDate endDate, boolean halfDay, BigDecimal hours,
                               BigDecimal amount, String note, String decisionNote, String decidedBy,
-                              Instant decidedAt, Instant createdAt) {
+                              Instant decidedAt, Instant createdAt, List<AttachmentInfo> attachments) {
         public static RequestView of(AbsenceRequest r) {
+            return of(r, List.of());
+        }
+
+        public static RequestView of(AbsenceRequest r, List<AttachmentInfo> attachments) {
             return new RequestView(r.getId(), UserSummary.of(r.getUser()), r.getType(), r.getStatus(),
                 r.getStartDate(), r.getEndDate(), r.isHalfDay(), r.getHours(), r.getAmount(), r.getNote(),
                 r.getDecisionNote(), r.getDecidedBy() == null ? null : r.getDecidedBy().getFullName(),
-                r.getDecidedAt(), r.getCreatedAt());
+                r.getDecidedAt(), r.getCreatedAt(), attachments);
         }
     }
 

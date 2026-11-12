@@ -2,7 +2,6 @@ package com.holidays.plan.service;
 
 import com.holidays.plan.domain.*;
 import com.holidays.plan.repo.AbsenceRequestRepository;
-import com.holidays.plan.web.dto.BalanceView;
 import com.holidays.plan.web.dto.RequestDtos.CreateRequest;
 import com.holidays.plan.web.dto.RequestDtos.Preview;
 import org.springframework.stereotype.Service;
@@ -25,16 +24,14 @@ public class RequestService {
 
     private final AbsenceRequestRepository requests;
     private final HolidayCalendar calendar;
-    private final BalanceService balances;
     private final AccessPolicy policy;
     private final AuditService audit;
     private final Clock clock;
 
-    public RequestService(AbsenceRequestRepository requests, HolidayCalendar calendar, BalanceService balances,
+    public RequestService(AbsenceRequestRepository requests, HolidayCalendar calendar, 
                           AccessPolicy policy, AuditService audit, Clock clock) {
         this.requests = requests;
         this.calendar = calendar;
-        this.balances = balances;
         this.policy = policy;
         this.audit = audit;
         this.clock = clock;
@@ -80,26 +77,14 @@ public class RequestService {
         }
     }
 
-    private BigDecimal available(User user, AbsenceType type, int year) {
-        BalanceView b = balances.balance(user, year);
-        return switch (type) {
-            case FERIE -> b.leaveAvailable();
-            case PERMESSO -> b.permitAvailable();
-            case MALATTIA -> null;
-        };
-    }
-
     @Transactional(readOnly = true)
     public Preview preview(User user, CreateRequest in) {
         Computed c = validateAndCompute(user, in);
-        BigDecimal avail = available(user, in.type(), in.startDate().getYear());
-        BigDecimal after = avail == null ? null : avail.subtract(c.amount());
         List<String> warnings = new ArrayList<>();
-        if (after != null && after.signum() < 0) warnings.add("Saldo insufficiente");
         if (requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING))
             warnings.add("Hai gia' una richiesta in quei giorni");
         List<String> colleagues = colleaguesAbsent(user, in.startDate(), in.endDate());
-        return new Preview(c.amount(), c.unit(), after, colleagues, warnings);
+        return new Preview(c.amount(), c.unit(), null, colleagues, warnings);
     }
 
     private List<String> colleaguesAbsent(User user, LocalDate from, LocalDate to) {
@@ -119,9 +104,6 @@ public class RequestService {
             .filter(r -> r.getStatus() == RequestStatus.PENDING).count();
         if (pending >= MAX_PENDING)
             throw ApiException.conflict("Hai gia' " + MAX_PENDING + " richieste in attesa");
-        BigDecimal avail = available(user, in.type(), in.startDate().getYear());
-        if (avail != null && avail.compareTo(c.amount()) < 0)
-            throw ApiException.conflict("Saldo insufficiente: disponibili " + avail.stripTrailingZeros().toPlainString() + " " + c.unit());
 
         AbsenceRequest r = new AbsenceRequest();
         r.setUser(user);

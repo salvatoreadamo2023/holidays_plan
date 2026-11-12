@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { ArrowRight, CheckCheck, Plane, Plus, Thermometer } from 'lucide-react'
+import { ArrowRight, CalendarOff, CheckCheck, Clock, Plane, Plus, Thermometer } from 'lucide-react'
 import { Link } from 'react-router'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { api } from '../lib/api'
@@ -9,7 +9,6 @@ import { useUi } from '../lib/ui'
 import { num, range, typeLabel } from '../lib/format'
 import type { Dashboard as D, RequestView } from '../lib/types'
 import { Avatar, Card, Empty, SectionTitle, StatusChip, TypeIcon } from '../components/ui'
-import { RingGauge } from '../components/RingGauge'
 import { YearHeatmap } from '../components/YearHeatmap'
 
 const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera' }
@@ -64,16 +63,26 @@ export function Dashboard() {
       <div className="grid gap-6 lg:grid-cols-3">
         <motion.div variants={rise} className="lg:col-span-2">
           <Card className="h-full">
-            <SectionTitle>Il tuo saldo {d?.balance.year}</SectionTitle>
+            <SectionTitle>Il tuo andamento {d?.trend.year ?? new Date().getFullYear()}</SectionTitle>
             {d && (
-              <div className="grid gap-8 sm:grid-cols-2">
-                <RingGauge label="Ferie" unit="giorni" total={d.balance.leaveTotal} used={d.balance.leaveUsed} pending={d.balance.leavePending} from="#8b5cf6" to="#06b6d4" />
-                <RingGauge label="Permessi" unit="ore" total={d.balance.permitTotal} used={d.balance.permitUsed} pending={d.balance.permitPending} from="#f59e0b" to="#f43f5e" />
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {[
+                  { label: 'Ferie', value: d.trend.leaveDays, unit: 'giorni', pending: d.trend.leavePending, icon: <Plane size={18} />, cls: 'from-violet-500 to-indigo-500' },
+                  { label: 'Permessi', value: d.trend.permitHours, unit: 'ore', pending: d.trend.permitPending, icon: <Clock size={18} />, cls: 'from-amber-500 to-rose-500' },
+                  { label: 'Malattia', value: d.trend.sickDays, unit: 'giorni', pending: 0, icon: <Thermometer size={18} />, cls: 'from-rose-500 to-pink-500' },
+                  { label: 'Assente', value: d.trend.absenceDays, unit: 'giorni in tutto', pending: 0, icon: <CalendarOff size={18} />, cls: 'from-cyan-500 to-sky-600' },
+                ].map(t => (
+                  <div key={t.label} className="rounded-2xl border border-soft p-4">
+                    <div className={`mb-3 grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br ${t.cls} text-white`}>{t.icon}</div>
+                    <div className="font-display text-3xl font-bold">{num(t.value)}</div>
+                    <div className="text-sm font-medium">{t.label}</div>
+                    <div className="text-xs text-muted">{t.unit}</div>
+                    {t.pending > 0 && <div className="mt-1 text-xs text-amber-600 dark:text-amber-300">+{num(t.pending)} in attesa</div>}
+                  </div>
+                ))}
               </div>
             )}
-            {d && d.balance.sickDays > 0 && (
-              <p className="mt-6 flex items-center gap-2 text-sm text-muted"><Thermometer size={15} /> {num(d.balance.sickDays)} giorni di malattia registrati quest'anno</p>
-            )}
+            <p className="mt-4 text-xs text-muted">Conteggi dalle richieste approvate dell'anno. "Assente" somma ferie, malattia e permessi (8 ore = 1 giorno).</p>
           </Card>
         </motion.div>
 

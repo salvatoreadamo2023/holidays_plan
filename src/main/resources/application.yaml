@@ -10,6 +10,10 @@ spring:
     show-sql: false
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jackson:
     serialization:
       write-dates-as-timestamps: false

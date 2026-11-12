@@ -7,6 +7,7 @@ import { api } from '../lib/api'
 import { num, range, roleLabel, typeLabel } from '../lib/format'
 import type { RequestView } from '../lib/types'
 import { Avatar, Button, Card, Empty, Field, inputCls, Modal, StatusChip, TypeIcon } from '../components/ui'
+import { Attachments } from '../components/Attachments'
 
 function Conflicts({ r }: { r: RequestView }) {
   // Chiede al calendario chi altro dell'area e' assente in quei giorni.
@@ -90,6 +91,7 @@ export function Approvals() {
                       {r.status === 'CANCEL_REQUESTED' && <StatusChip status={r.status} />}
                     </div>
                     {r.note && <p className="mt-3 rounded-xl bg-[var(--grid)] px-3 py-2 text-sm">“{r.note}”</p>}
+                    <Attachments requestId={r.id} items={r.attachments ?? []} />
                     <div className="mt-3"><Conflicts r={r} /></div>
                   </div>
                   <div className="flex w-full gap-2 sm:w-auto sm:flex-col">

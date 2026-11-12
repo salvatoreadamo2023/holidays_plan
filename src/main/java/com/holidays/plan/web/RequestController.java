@@ -15,10 +15,12 @@ import java.util.List;
 public class RequestController {
     private final RequestService service;
     private final CurrentUser currentUser;
+    private final RequestViewer views;
 
-    public RequestController(RequestService service, CurrentUser currentUser) {
+    public RequestController(RequestService service, CurrentUser currentUser, RequestViewer views) {
         this.service = service;
         this.currentUser = currentUser;
+        this.views = views;
     }
 
     @PostMapping("/preview")
@@ -31,54 +33,54 @@ public class RequestController {
     @ResponseStatus(HttpStatus.CREATED)
     @Transactional
     public RequestView create(@Valid @RequestBody CreateRequest in) {
-        return RequestView.of(service.create(currentUser.get(), in));
+        return views.one(service.create(currentUser.get(), in));
     }
 
     @GetMapping("/mine")
     @Transactional(readOnly = true)
     public List<RequestView> mine() {
-        return service.mine(currentUser.get()).stream().map(RequestView::of).toList();
+        return views.many(service.mine(currentUser.get()));
     }
 
     @GetMapping("/to-approve")
     @Transactional(readOnly = true)
     public List<RequestView> toApprove() {
-        return service.toDecide(currentUser.get()).stream().map(RequestView::of).toList();
+        return views.many(service.toDecide(currentUser.get()));
     }
 
     @PostMapping("/{id}/approve")
     @Transactional
     public RequestView approve(@PathVariable Long id, @Valid @RequestBody(required = false) Decision d) {
-        return RequestView.of(service.approve(currentUser.get(), id, d == null ? null : d.note()));
+        return views.one(service.approve(currentUser.get(), id, d == null ? null : d.note()));
     }
 
     @PostMapping("/{id}/reject")
     @Transactional
     public RequestView reject(@PathVariable Long id, @Valid @RequestBody Decision d) {
-        return RequestView.of(service.reject(currentUser.get(), id, d.note()));
+        return views.one(service.reject(currentUser.get(), id, d.note()));
     }
 
     @PostMapping("/{id}/withdraw")
     @Transactional
     public RequestView withdraw(@PathVariable Long id) {
-        return RequestView.of(service.withdraw(currentUser.get(), id));
+        return views.one(service.withdraw(currentUser.get(), id));
     }
 
     @PostMapping("/{id}/cancel")
     @Transactional
     public RequestView requestCancel(@PathVariable Long id, @Valid @RequestBody(required = false) Decision d) {
-        return RequestView.of(service.requestCancel(currentUser.get(), id, d == null ? null : d.note()));
+        return views.one(service.requestCancel(currentUser.get(), id, d == null ? null : d.note()));
     }
 
     @PostMapping("/{id}/cancel/accept")
     @Transactional
     public RequestView acceptCancel(@PathVariable Long id, @Valid @RequestBody(required = false) Decision d) {
-        return RequestView.of(service.decideCancel(currentUser.get(), id, true, d == null ? null : d.note()));
+        return views.one(service.decideCancel(currentUser.get(), id, true, d == null ? null : d.note()));
     }
 
     @PostMapping("/{id}/cancel/deny")
     @Transactional
     public RequestView denyCancel(@PathVariable Long id, @Valid @RequestBody(required = false) Decision d) {
-        return RequestView.of(service.decideCancel(currentUser.get(), id, false, d == null ? null : d.note()));
+        return views.one(service.decideCancel(currentUser.get(), id, false, d == null ? null : d.note()));
     }
 }

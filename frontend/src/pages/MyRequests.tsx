@@ -8,6 +8,7 @@ import { api } from '../lib/api'
 import { fmt, num, range, typeLabel } from '../lib/format'
 import type { RequestView, Status } from '../lib/types'
 import { Button, Card, Empty, StatusChip, TypeIcon } from '../components/ui'
+import { Attachments } from '../components/Attachments'
 
 const filters: { key: string; label: string; match: (s: Status) => boolean }[] = [
   { key: 'all', label: 'Tutte', match: () => true },
@@ -63,6 +64,7 @@ export function MyRequests() {
                       {r.decisionNote && <> · <span className={r.status === 'REJECTED' ? 'text-rose-500' : ''}>{r.decisionNote}</span></>}
                     </div>
                   )}
+                  <Attachments requestId={r.id} items={r.attachments ?? []} editable={r.status !== 'WITHDRAWN'} />
                 </div>
                 {r.status === 'PENDING' && <Button onClick={() => act.mutate({ id: r.id, action: 'withdraw' })}><Undo2 size={16} /> Ritira</Button>}
                 {r.status === 'APPROVED' && r.endDate >= today && <Button onClick={() => act.mutate({ id: r.id, action: 'cancel' })}><XCircle size={16} /> Annulla</Button>}

@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -162,11 +163,80 @@ class SecurityAndFlowTest {
     }
 
     @Test
-    void saldoInsufficiente() throws Exception {
+    void ilSaldoNonBloccaLaRichiesta() throws Exception {
         LocalDate d = LocalDate.now().plusYears(1).withMonth(1).withDayOfMonth(10);
         mvc.perform(post("/api/requests").header("Authorization", token("elena")).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", d.toString(), "endDate", d.plusDays(55).toString()))))
-            .andExpect(status().isConflict());
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    void andamentoContaSoloLeApprovate() throws Exception {
+        LocalDate d = freshMonday();
+        String t = token("andrea");
+        JsonNode before = json.readTree(mvc.perform(get("/api/trend?year=" + d.getYear()).header("Authorization", t))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        long id = createFerie(t, d, d.plusDays(1));
+        JsonNode pending = json.readTree(mvc.perform(get("/api/trend?year=" + d.getYear()).header("Authorization", t))
+            .andReturn().getResponse().getContentAsString());
+        assertThat(pending.get("leaveDays").asDouble()).isEqualTo(before.get("leaveDays").asDouble());
+        assertThat(pending.get("leavePending").asDouble()).isEqualTo(before.get("leavePending").asDouble() + 2);
+        mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("pm2"))).andExpect(status().isOk());
+        JsonNode after = json.readTree(mvc.perform(get("/api/trend?year=" + d.getYear()).header("Authorization", t))
+            .andReturn().getResponse().getContentAsString());
+        assertThat(after.get("leaveDays").asDouble()).isEqualTo(before.get("leaveDays").asDouble() + 2);
+        assertThat(after.get("absenceDays").asDouble()).isEqualTo(before.get("absenceDays").asDouble() + 2);
+    }
+
+    private static final byte[] PDF = "%PDF-1.4\n%test\n".getBytes();
+
+    @Test
+    void allegati_caricaVediScaricaConLinkFirmato() throws Exception {
+        LocalDate d = freshMonday();
+        String t = token("andrea");
+        long id = createFerie(t, d, d);
+        String up = mvc.perform(multipart("/api/requests/" + id + "/attachments")
+                .file(new MockMultipartFile("file", "../../certificato medico.pdf", "application/pdf", PDF))
+                .header("Authorization", t))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        JsonNode att = json.readTree(up);
+        assertThat(att.get("filename").asText()).isEqualTo("certificato medico.pdf");
+        long attId = att.get("id").asLong();
+
+        // Compare nelle mie richieste e in quelle da approvare del PM dell'area
+        assertThat(mvc.perform(get("/api/requests/mine").header("Authorization", t)).andReturn().getResponse()
+            .getContentAsString()).contains("certificato medico.pdf");
+        assertThat(mvc.perform(get("/api/requests/to-approve").header("Authorization", token("pm2"))).andReturn()
+            .getResponse().getContentAsString()).contains("certificato medico.pdf");
+
+        // Chi non vede i dettagli non lo vede e non ottiene il link
+        mvc.perform(get("/api/attachments/" + attId + "/link").header("Authorization", token("elena")))
+            .andExpect(status().isNotFound());
+        mvc.perform(multipart("/api/requests/" + id + "/attachments")
+                .file(new MockMultipartFile("file", "x.pdf", "application/pdf", PDF))
+                .header("Authorization", token("pm2")))
+            .andExpect(status().isForbidden());
+
+        String url = json.readTree(mvc.perform(get("/api/attachments/" + attId + "/link").header("Authorization", token("pm2")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("url").asText();
+        mvc.perform(get(url)).andExpect(status().isOk())
+            .andExpect(content().contentType("application/pdf")).andExpect(content().bytes(PDF));
+        mvc.perform(get(url.replaceAll("sig=.*", "sig=falsa"))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/files/" + attId + "?exp=1&sig=x")).andExpect(status().isGone());
+
+        mvc.perform(delete("/api/attachments/" + attId).header("Authorization", t)).andExpect(status().isNoContent());
+        mvc.perform(get(url)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void allegati_soloPdfJpgPng() throws Exception {
+        LocalDate d = freshMonday();
+        String t = token("andrea");
+        long id = createFerie(t, d, d);
+        mvc.perform(multipart("/api/requests/" + id + "/attachments")
+                .file(new MockMultipartFile("file", "finto.pdf", "application/pdf", "<script>alert(1)</script>".getBytes()))
+                .header("Authorization", t))
+            .andExpect(status().isBadRequest());
     }
 
     @Test

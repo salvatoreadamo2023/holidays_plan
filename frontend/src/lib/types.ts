@@ -12,6 +12,16 @@ export interface RequestView {
   id: number; user: UserSummary; type: AbsenceType; status: Status
   startDate: string; endDate: string; halfDay: boolean; hours: number | null; amount: number
   note: string | null; decisionNote: string | null; decidedBy: string | null; decidedAt: string | null; createdAt: string
+  attachments: AttachmentInfo[]
+}
+
+export interface AttachmentInfo { id: number; requestId: number; filename: string; contentType: string; sizeBytes: number; createdAt: string }
+
+export interface Trend {
+  year: number
+  leaveDays: number; leavePending: number
+  permitHours: number; permitPending: number
+  sickDays: number; absenceDays: number
 }
 
 export interface Balance {
@@ -22,7 +32,7 @@ export interface Balance {
 }
 
 export interface Dashboard {
-  me: UserSummary; balance: Balance; upcoming: RequestView[]; toApprove: number; absentToday: string[]
+  me: UserSummary; balance: Balance; trend: Trend; upcoming: RequestView[]; toApprove: number; absentToday: string[]
 }
 
 export interface CalendarView {

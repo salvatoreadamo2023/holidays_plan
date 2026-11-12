@@ -5,7 +5,7 @@ import { Building2, CalendarHeart, Pencil, Plus, Search, Trash2, Users, UsersRou
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
-import { fmt, num, roleLabel } from '../lib/format'
+import { fmt, roleLabel } from '../lib/format'
 import type { AreaAdmin, HolidayAdmin, Role, TeamAdmin, UserAdmin } from '../lib/types'
 import { Avatar, Button, Card, Field, inputCls, Modal } from '../components/ui'
 
@@ -25,7 +25,7 @@ export function Admin() {
     <div className="mx-auto max-w-6xl space-y-6">
       <header>
         <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Amministrazione</h1>
-        <p className="mt-1 text-sm text-muted">Organizzazione, persone, saldi annuali e chiusure aziendali.</p>
+        <p className="mt-1 text-sm text-muted">Organizzazione, persone e chiusure aziendali.</p>
       </header>
       <div className="glass inline-flex flex-wrap gap-1 rounded-2xl p-1">
         {tabs.map(t => (
@@ -78,9 +78,9 @@ function UsersTab() {
         <Button variant="primary" onClick={() => setEdit({ ...emptyUser })}><Plus size={16} /> Nuova persona</Button>
       </div>
       <div className="scrollbar-thin overflow-x-auto">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[600px] text-sm">
           <thead className="text-left text-xs uppercase tracking-wider text-muted">
-            <tr><th className="px-4 py-3">Persona</th><th>Ruolo</th><th>Area / Team</th><th className="text-right">Ferie</th><th className="text-right">Permessi</th><th className="px-4" /></tr>
+            <tr><th className="px-4 py-3">Persona</th><th>Ruolo</th><th>Area / Team</th><th className="px-4" /></tr>
           </thead>
           <tbody>
             {list.map(u => (
@@ -88,8 +88,6 @@ function UsersTab() {
                 <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar name={u.fullName} size={34} /><div><div className="font-semibold">{u.fullName}</div><div className="text-xs text-muted">{u.username} · {u.email}</div></div></div></td>
                 <td>{roleLabel[u.role]}{!u.active && <span className="ml-2 text-xs text-rose-500">disattivato</span>}</td>
                 <td>{u.areaName ?? '–'}{u.teamName && <span className="text-muted"> / {u.teamName}</span>}</td>
-                <td className="text-right">{num(u.annualLeaveDays)} gg</td>
-                <td className="text-right">{num(u.annualPermitHours)} h</td>
                 <td className="px-4 text-right"><button className="rounded-lg p-2 hover:bg-violet-500/10" aria-label="Modifica" onClick={() => setEdit({ ...u, password: '' })}><Pencil size={15} /></button></td>
               </tr>
             ))}
@@ -126,8 +124,6 @@ function UsersTab() {
                 <option value="1">Attivo</option><option value="0">Disattivato</option>
               </select>
             </Field>
-            <Field label="Giorni di ferie annui"><input className={inputCls} type="number" step="0.5" min="0" max="60" value={edit.annualLeaveDays} onChange={e => set('annualLeaveDays', Number(e.target.value))} /></Field>
-            <Field label="Ore di permesso annue"><input className={inputCls} type="number" step="0.5" min="0" max="400" value={edit.annualPermitHours} onChange={e => set('annualPermitHours', Number(e.target.value))} /></Field>
             <div className="flex justify-end gap-2 sm:col-span-2">
               <Button type="button" onClick={() => setEdit(null)}>Annulla</Button>
               <Button variant="primary" disabled={save.isPending}>Salva</Button>

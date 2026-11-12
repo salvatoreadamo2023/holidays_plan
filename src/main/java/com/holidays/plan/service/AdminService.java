@@ -80,8 +80,8 @@ public class AdminService {
         u.setEmail(in.email().trim());
         u.setFullName(in.fullName().trim());
         u.setActive(in.active());
-        u.setAnnualLeaveDays(in.annualLeaveDays());
-        u.setAnnualPermitHours(in.annualPermitHours());
+        if (in.annualLeaveDays() != null) u.setAnnualLeaveDays(in.annualLeaveDays());
+        if (in.annualPermitHours() != null) u.setAnnualPermitHours(in.annualPermitHours());
         applyOrg(u, in.role(), in.areaId(), in.teamId());
         if (in.newPassword() != null && !in.newPassword().isBlank()) {
             u.setPasswordHash(encoder.encode(in.newPassword()));
