@@ -1,0 +1,17 @@
+# Profilo di sviluppo: database H2 in memoria, dati demo, Swagger attivo.
+spring:
+  datasource:
+    url: jdbc:h2:mem:ferie;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+  cors:
+    allowed-origins: http://localhost:5173
+  seed-demo-data: true
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

@@ -1,0 +1,8 @@
+# Profilo di produzione: MySQL (Aiven/Render oggi, AWS RDS o Cloud SQL domani).
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+app:
+  seed-demo-data: false

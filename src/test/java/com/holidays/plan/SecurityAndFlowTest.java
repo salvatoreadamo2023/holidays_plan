@@ -1,0 +1,201 @@
+package com.holidays.plan;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.holidays.plan.config.DemoDataSeeder;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("dev")
+class SecurityAndFlowTest {
+    @Autowired MockMvc mvc;
+    @Autowired ObjectMapper json;
+
+    /** Ogni test usa una settimana diversa per non sovrapporsi. */
+    private static final AtomicInteger WEEK = new AtomicInteger(8);
+
+    private static LocalDate freshMonday() {
+        return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY)).plusWeeks(WEEK.getAndIncrement());
+    }
+
+    private String token(String username) throws Exception {
+        MvcResult r = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("username", username, "password", DemoDataSeeder.DEMO_PASSWORD))))
+            .andExpect(status().isOk()).andReturn();
+        return "Bearer " + json.readTree(r.getResponse().getContentAsString()).get("token").asText();
+    }
+
+    private long createFerie(String tok, LocalDate from, LocalDate to) throws Exception {
+        MvcResult r = mvc.perform(post("/api/requests").header("Authorization", tok).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", from.toString(), "endDate", to.toString()))))
+            .andExpect(status().isCreated()).andReturn();
+        return json.readTree(r.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    @Test
+    void apiRichiedeLogin() throws Exception {
+        mvc.perform(get("/api/requests/mine")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void credenzialiErrateEBloccoDopoTentativi() throws Exception {
+        String body = json.writeValueAsString(Map.of("username", "elena", "password", "sbagliata"));
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void userNonAccedeAdAdmin() throws Exception {
+        mvc.perform(get("/api/admin/users").header("Authorization", token("user"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/users").header("Authorization", token("pm"))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void nessunaPasswordNelleRisposte() throws Exception {
+        String body = mvc.perform(get("/api/admin/users").header("Authorization", token("admin")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(body.toLowerCase()).doesNotContain("password").doesNotContain("$2a$");
+    }
+
+    @Test
+    void utenteDalBodyIgnorato_richiestaSempreDellUtenteLoggato() throws Exception {
+        LocalDate d = freshMonday();
+        MvcResult r = mvc.perform(post("/api/requests").header("Authorization", token("user")).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"FERIE\",\"startDate\":\"" + d + "\",\"endDate\":\"" + d + "\",\"user\":{\"id\":1},\"id\":1,\"status\":\"APPROVED\"}"))
+            .andExpect(status().isCreated()).andReturn();
+        JsonNode n = json.readTree(r.getResponse().getContentAsString());
+        assertThat(n.get("user").get("username").asText()).isEqualTo("user");
+        assertThat(n.get("status").asText()).isEqualTo("PENDING");
+        assertThat(n.get("id").asLong()).isNotEqualTo(1L);
+    }
+
+    @Test
+    void techLeadDellAreaApprovaUnoUser_altraAreaNo() throws Exception {
+        LocalDate d = freshMonday();
+        long id = createFerie(token("user"), d, d.plusDays(1));
+        // PM di un'altra area: vietato
+        mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("pm2")))
+            .andExpect(status().isForbidden());
+        // L'utente stesso: vietato
+        mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("user")))
+            .andExpect(status().isForbidden());
+        // TL di un altro team ma stessa area: consentito (gestisce l'area)
+        mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("techlead2")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
+        // Gia' decisa: conflitto
+        mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("pm")))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void nessunoApprovaSeStesso_eTLNonApprovaIlPM() throws Exception {
+        LocalDate d = freshMonday();
+        String tl = token("techlead");
+        long own = createFerie(tl, d, d);
+        mvc.perform(post("/api/requests/" + own + "/approve").header("Authorization", tl)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/requests/" + own + "/approve").header("Authorization", token("techlead2"))).andExpect(status().isForbidden());
+        mvc.perform(post("/api/requests/" + own + "/approve").header("Authorization", token("pm"))).andExpect(status().isOk());
+
+        long pmReq = createFerie(token("pm"), d.plusDays(2), d.plusDays(2));
+        mvc.perform(post("/api/requests/" + pmReq + "/approve").header("Authorization", tl)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/requests/" + pmReq + "/approve").header("Authorization", token("admin"))).andExpect(status().isOk());
+    }
+
+    @Test
+    void rifiutoRichiedeMotivo() throws Exception {
+        LocalDate d = freshMonday();
+        long id = createFerie(token("sara"), d, d);
+        String pm = token("pm");
+        mvc.perform(post("/api/requests/" + id + "/reject").header("Authorization", pm)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"\"}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/requests/" + id + "/reject").header("Authorization", pm)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Rilascio in quella settimana\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
+    }
+
+    @Test
+    void sovrapposizioneBloccata() throws Exception {
+        LocalDate d = freshMonday();
+        String t = token("davide");
+        createFerie(t, d, d.plusDays(2));
+        mvc.perform(post("/api/requests").header("Authorization", t).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", d.plusDays(1).toString(), "endDate", d.plusDays(3).toString()))))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void annullamentoRipristinaSaldo() throws Exception {
+        LocalDate d = freshMonday();
+        String t = token("andrea");
+        double before = json.readTree(mvc.perform(get("/api/balance?year=" + d.getYear()).header("Authorization", t))
+            .andReturn().getResponse().getContentAsString()).get("leaveAvailable").asDouble();
+        long id = createFerie(t, d, d.plusDays(1));
+        mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("pm2"))).andExpect(status().isOk());
+        mvc.perform(post("/api/requests/" + id + "/cancel").header("Authorization", t)).andExpect(status().isOk());
+        mvc.perform(post("/api/requests/" + id + "/cancel/accept").header("Authorization", token("pm2")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        double after = json.readTree(mvc.perform(get("/api/balance?year=" + d.getYear()).header("Authorization", t))
+            .andReturn().getResponse().getContentAsString()).get("leaveAvailable").asDouble();
+        assertThat(after).isEqualTo(before);
+    }
+
+    @Test
+    void saldoInsufficiente() throws Exception {
+        LocalDate d = LocalDate.now().plusYears(1).withMonth(1).withDayOfMonth(10);
+        mvc.perform(post("/api/requests").header("Authorization", token("elena")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", d.toString(), "endDate", d.plusDays(55).toString()))))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void calendarioUser_nascondeTipoEAltreAree() throws Exception {
+        LocalDate from = LocalDate.now().withDayOfMonth(1);
+        String t = token("user");
+        String body = mvc.perform(get("/api/calendar").param("from", from.toString()).param("to", from.plusMonths(2).toString())
+                .header("Authorization", t))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        JsonNode v = json.readTree(body);
+        long me = json.readTree(mvc.perform(get("/api/auth/me").header("Authorization", t)).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        for (JsonNode e : v.get("entries")) {
+            if (e.get("userId").asLong() != me) {
+                assertThat(e.get("type").asText()).isEqualTo("ASSENZA");
+                assertThat(e.get("status").asText()).isNotEqualTo("PENDING");
+            }
+        }
+        assertThat(body).doesNotContain("MALATTIA");
+        // Area Operations (id 2): vietata a uno user di Sviluppo
+        mvc.perform(get("/api/calendar").param("from", from.toString()).param("to", from.plusDays(10).toString())
+            .param("areaId", "2").header("Authorization", t)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void daApprovare_soloCompetenza() throws Exception {
+        String body = mvc.perform(get("/api/requests/to-approve").header("Authorization", token("pm2")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(body).doesNotContain("Sviluppo");
+        mvc.perform(get("/api/requests/to-approve").header("Authorization", token("user")))
+            .andExpect(status().isOk()).andExpect(content().json("[]"));
+    }
+}
