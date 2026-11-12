@@ -81,7 +81,7 @@ public class AdminController {
     @GetMapping("/holidays")
     public List<HolidayView> holidays(@RequestParam(required = false) Integer year) {
         currentUser.get();
-        return admin.listHolidays(year == null ? LocalDate.now().getYear() : year);
+        return admin.listHolidays(year == null ? LocalDate.now(com.holidays.plan.config.ClockConfig.ZONE).getYear() : year);
     }
 
     @PostMapping("/holidays")

@@ -76,7 +76,7 @@ public class CalendarService {
     /** Persone assenti oggi nell'area visibile all'utente. */
     @Transactional(readOnly = true)
     public List<String> absentToday(User actor) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(com.holidays.plan.config.ClockConfig.ZONE);
         boolean admin = actor.getRole() == Role.ADMIN;
         return requests.findOverlapping(today, today, RequestStatus.ACTIVE).stream()
             .map(AbsenceRequest::getUser)

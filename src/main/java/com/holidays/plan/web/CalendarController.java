@@ -92,7 +92,7 @@ public class CalendarController {
     @Transactional(readOnly = true)
     public Dashboard dashboard() {
         User u = currentUser.get();
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(com.holidays.plan.config.ClockConfig.ZONE);
         List<RequestView> upcoming = views.many(requests.mine(u).stream()
             .filter(r -> !r.getEndDate().isBefore(today))
             .filter(r -> r.getStatus().name().matches("PENDING|APPROVED|CANCEL_REQUESTED"))
@@ -106,12 +106,12 @@ public class CalendarController {
     @GetMapping("/trend")
     @Transactional(readOnly = true)
     public TrendView trend(@RequestParam(required = false) Integer year) {
-        return balances.trend(currentUser.get(), year == null ? LocalDate.now().getYear() : year);
+        return balances.trend(currentUser.get(), year == null ? LocalDate.now(com.holidays.plan.config.ClockConfig.ZONE).getYear() : year);
     }
 
     @GetMapping("/balance")
     @Transactional(readOnly = true)
     public BalanceView balance(@RequestParam(required = false) Integer year) {
-        return balances.balance(currentUser.get(), year == null ? LocalDate.now().getYear() : year);
+        return balances.balance(currentUser.get(), year == null ? LocalDate.now(com.holidays.plan.config.ClockConfig.ZONE).getYear() : year);
     }
 }

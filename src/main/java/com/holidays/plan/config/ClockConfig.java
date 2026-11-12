@@ -8,8 +8,11 @@ import java.time.ZoneId;
 
 @Configuration
 public class ClockConfig {
+    /** Fuso orario aziendale: il server (Render) gira in UTC, le date vanno calcolate in Italia. */
+    public static final ZoneId ZONE = ZoneId.of("Europe/Rome");
+
     @Bean
     Clock clock() {
-        return Clock.system(ZoneId.of("Europe/Rome"));
+        return Clock.system(ZONE);
     }
 }
