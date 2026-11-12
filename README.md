@@ -41,7 +41,7 @@ docker run -p 8080:8080 \
 
 Variabili: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` (obbligatorie), `JWT_TTL_HOURS` (default 8), `CORS_ALLOWED_ORIGINS` (solo se il frontend è su un altro dominio), `PORT`.
 
-Lo schema del database è gestito da Flyway (`src/main/resources/db/migration`). Il primo Admin in produzione va inserito a mano (vedi sotto) e poi crea tutti gli altri dall'interfaccia.
+Lo schema del database è gestito da Flyway (`src/main/resources/db/migration`). Il primo Admin si crea da solo al primo avvio se imposti `ADMIN_INITIAL_PASSWORD` (almeno 12 caratteri; opzionali `ADMIN_INITIAL_USERNAME`, `ADMIN_INITIAL_EMAIL`) e il database è vuoto. In alternativa puoi inserirlo a mano:
 
 ```sql
 -- password generata con BCrypt (cost 12)
