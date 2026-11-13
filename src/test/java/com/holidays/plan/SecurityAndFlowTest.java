@@ -581,4 +581,47 @@ class SecurityAndFlowTest {
         assertThat(month(onlySick, "GENERAL_LEAVE", 2)).isLessThan(month(b1, "GENERAL_LEAVE", 2));
         assertThat(b1.get("people").asInt()).isGreaterThan(5);
     }
+
+    @Test
+    void saldiResidui_modelloAnteprimaCaricamentoEVistaPersonale() throws Exception {
+        String admin = token("admin");
+        byte[] tpl = mvc.perform(get("/api/admin/balances/template").header("Authorization", admin))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertThat(new String(tpl, 0, 2)).isEqualTo("PK");
+        mvc.perform(get("/api/admin/balances/template").header("Authorization", token("user"))).andExpect(status().isForbidden());
+
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        org.dhatim.fastexcel.Workbook wb = new org.dhatim.fastexcel.Workbook(out, "test", "1.0");
+        org.dhatim.fastexcel.Worksheet ws = wb.newWorksheet("Saldi");
+        ws.value(0, 0, "Username"); ws.value(0, 1, "Nome e cognome"); ws.value(0, 3, "Ferie residue (giorni)"); ws.value(0, 4, "Permessi residui (ore)");
+        ws.value(1, 0, "user"); ws.value(1, 3, "14,5"); ws.value(1, 4, 32);
+        ws.value(2, 0, "nessuno"); ws.value(2, 3, 3);
+        ws.value(3, 0, "pm"); ws.value(3, 3, "abc");
+        wb.finish();
+        MockMultipartFile file = new MockMultipartFile("file", "saldi.xlsx", "application/octet-stream", out.toByteArray());
+        String month = java.time.YearMonth.now().minusMonths(1).toString();
+
+        JsonNode prev = json.readTree(mvc.perform(multipart("/api/admin/balances/import").file(file).param("month", month)
+                .header("Authorization", admin)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(prev.get("valid").asInt()).isEqualTo(1);
+        assertThat(prev.get("errors").asInt()).isEqualTo(2);
+        assertThat(prev.get("applied").asBoolean()).isFalse();
+        // anteprima: niente salvato
+        assertThat(json.readTree(mvc.perform(get("/api/balances/me").header("Authorization", token("user")))
+            .andReturn().getResponse().getContentAsString()).get("available").asBoolean()).isFalse();
+
+        mvc.perform(multipart("/api/admin/balances/import").file(file).param("month", month).param("apply", "true")
+            .header("Authorization", admin)).andExpect(status().isOk());
+        JsonNode me = json.readTree(mvc.perform(get("/api/balances/me").header("Authorization", token("user")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(me.get("available").asBoolean()).isTrue();
+        assertThat(me.get("referenceMonth").asText()).isEqualTo(month);
+        assertThat(me.get("leaveDays").decimalValue()).isEqualByComparingTo("14.5");
+        assertThat(me.get("permitHours").decimalValue()).isEqualByComparingTo("32");
+
+        mvc.perform(multipart("/api/admin/balances/import").file(file).param("month", month).header("Authorization", token("pm")))
+            .andExpect(status().isForbidden());
+        mvc.perform(multipart("/api/admin/balances/import").file(file).param("month", "2999-01").header("Authorization", admin))
+            .andExpect(status().isBadRequest());
+    }
 }

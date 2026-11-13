@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Building2, CalendarHeart, History, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
+import { Building2, CalendarHeart, History, Wallet, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
@@ -9,12 +9,14 @@ import { fmt, roleLabel, typeLabel } from '../lib/format'
 import type { AbsenceType, AreaAdmin, HolidayAdmin, Role, TeamAdmin, UserAdmin } from '../lib/types'
 import { Avatar, Button, Card, Field, inputCls, Modal } from '../components/ui'
 import { t, t as tt } from '../lib/i18n'
+import { BalancesTab } from '../components/BalancesTab'
 
 const tabs = [
   { key: 'users', label: 'Persone', icon: Users },
   { key: 'areas', label: 'Aree', icon: Building2 },
   { key: 'teams', label: 'Team', icon: UsersRound },
   { key: 'holidays', label: 'Festività', icon: CalendarHeart },
+  { key: 'balances', label: 'Saldi', icon: Wallet },
   { key: 'audit', label: 'Storico', icon: History },
 ] as const
 type Tab = typeof tabs[number]['key']
@@ -41,6 +43,7 @@ export function Admin() {
       {tab === 'areas' && <AreasTab />}
       {tab === 'teams' && <TeamsTab />}
       {tab === 'holidays' && <HolidaysTab />}
+      {tab === 'balances' && <BalancesTab />}
       {tab === 'audit' && <AuditTab />}
     </div>
   )
@@ -276,7 +279,7 @@ export const auditLabel: Record<string, string> = {
   CREATED: 'ha creato una richiesta', APPROVED: 'ha approvato', REJECTED: 'ha rifiutato', WITHDRAWN: 'ha ritirato',
   CANCEL_REQUESTED: "ha chiesto l'annullamento", CANCELLED: "ha confermato l'annullamento", CANCEL_DENIED: "ha respinto l'annullamento",
   ATTACHMENT_ADDED: 'ha allegato un file', ATTACHMENT_REMOVED: 'ha tolto un allegato', CERTIFICATE_REMINDER: 'promemoria certificato inviato', AUTO_APPROVED: 'approvazione automatica (nessun responsabile)', AUTO_CANCELLED: 'annullamento automatico (nessun responsabile)', SICK_RECORDED: 'malattia registrata', RECORDED: 'registrata senza approvazione', CREATED_ON_BEHALF: "ha inserito un'assenza per conto di", DAYS_RECOMPUTED: 'giorni ricalcolati (chiusura aziendale)',
-  USER_CREATED: 'ha creato un utente', USER_UPDATED: 'ha modificato un utente', PASSWORD_RESET: 'ha reimpostato una password', CONVERTED: 'ha trasformato le ferie ipotetiche in richiesta',
+  USER_CREATED: 'ha creato un utente', USER_UPDATED: 'ha modificato un utente', PASSWORD_RESET: 'ha reimpostato una password', CONVERTED: 'ha trasformato le ferie ipotetiche in richiesta', BALANCES_UPLOADED: 'ha caricato i saldi residui',
 }
 
 const AUDIT_PAGE = 50

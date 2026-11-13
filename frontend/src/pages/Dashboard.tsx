@@ -10,6 +10,7 @@ import { isPresence, num, range, typeLabel } from '../lib/format'
 import type { Dashboard as D, RequestView } from '../lib/types'
 import { Avatar, Card, Empty, SectionTitle, StatusChip, TypeIcon } from '../components/ui'
 import { YearHeatmap } from '../components/YearHeatmap'
+import { BalanceCard } from '../components/BalanceCard'
 import { t, t as tt } from '../lib/i18n'
 
 const greet = () => { const h = new Date().getHours(); return t(h < 12 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera') }
@@ -103,6 +104,7 @@ export function Dashboard() {
               </Card>
             </Link>
           )}
+          <BalanceCard />
           <Card>
             <SectionTitle><span className="flex items-center gap-2"><Plane size={18} /> {t('Fuori oggi')}</span></SectionTitle>
             {d && d.absentToday.length > 0 ? (
