@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -16,15 +16,20 @@ import { MyRequests } from './pages/MyRequests'
 import { Approvals } from './pages/Approvals'
 import { Admin } from './pages/Admin'
 import StatsPage from './pages/Stats'
+import { Intro, shouldShowIntro } from './components/Intro'
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 15_000, refetchOnWindowFocus: true, retry: 1 } } })
 
 function AppRoutes() {
   const { user, loading } = useAuth()
   const { dark } = useUi()
+  const [introDone, setIntroDone] = useState<string | null>(null)
   if (loading) return <div className="grid h-full place-items-center"><div className="h-10 w-10 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" /></div>
   return (
     <>
+      {user && !user.mustChangePassword && introDone !== String(user.id) && shouldShowIntro(user.id) && (
+        <Intro userId={user.id} onDone={() => setIntroDone(String(user.id))} />
+      )}
       <Toaster theme={dark ? 'dark' : 'light'} position="top-right" richColors closeButton />
       {!user ? <Login /> : user.mustChangePassword ? <ChangePassword forced /> : (
         <Routes>

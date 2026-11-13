@@ -30,6 +30,7 @@ export const EN: Record<string, string> = {
   'Vai a': 'Go to', 'Calendario area': 'Area calendar', 'Le mie richieste': 'My requests', 'Da approvare': 'To approve', 'Amministrazione': 'Administration',
 
   // Login e password
+  'Gestione Ferie': 'Leave Manager', 'Ferie e permessi': 'Holidays and leave', 'in un clic': 'in one click',
   'Addio Excel.': 'Goodbye Excel.', 'Ciao ferie.': 'Hello holidays.',
   'Chiedi, approva e pianifica le assenze del tuo team in pochi secondi.': 'Request, approve and plan your team\'s time off in seconds.',
   'Accesso…': 'Signing in…', 'Entra': 'Sign in',
