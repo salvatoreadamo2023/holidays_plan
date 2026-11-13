@@ -14,6 +14,7 @@ import { CalendarPage } from './pages/CalendarPage'
 import { MyRequests } from './pages/MyRequests'
 import { Approvals } from './pages/Approvals'
 import { Admin } from './pages/Admin'
+import StatsPage from './pages/Stats'
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 15_000, refetchOnWindowFocus: true, retry: 1 } } })
 
@@ -33,6 +34,7 @@ function AppRoutes() {
             <Route path="password" element={<ChangePassword />} />
             {isManager(user) && <Route path="approvazioni" element={<Approvals />} />}
             {isAdmin(user) && <Route path="admin" element={<Admin />} />}
+            {isAdmin(user) && <Route path="statistiche" element={<StatsPage />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

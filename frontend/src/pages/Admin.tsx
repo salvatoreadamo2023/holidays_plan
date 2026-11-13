@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Building2, CalendarHeart, History, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
 import clsx from 'clsx'
@@ -278,16 +278,27 @@ export const auditLabel: Record<string, string> = {
   USER_CREATED: 'ha creato un utente', USER_UPDATED: 'ha modificato un utente', PASSWORD_RESET: 'ha reimpostato una password',
 }
 
+const AUDIT_PAGE = 50
+
 function AuditTab() {
-  const q = useQuery({ queryKey: ['admin', 'audit'], queryFn: () => api<AuditRow[]>('/api/admin/audit') })
   const [s, setS] = useState('')
-  const list = (q.data ?? []).filter(e => !s || `${e.actorName} ${e.ownerName ?? ''} ${e.detail ?? ''} ${auditLabel[e.action] ?? e.action}`.toLowerCase().includes(s.toLowerCase()))
+  const [term, setTerm] = useState('')
+  useEffect(() => { const t = setTimeout(() => setTerm(s.trim()), 350); return () => clearTimeout(t) }, [s])
+  // Storico a pagine dalla piu' recente: "Carica altre" chiede le successive partendo dall'ultima riga.
+  const q = useInfiniteQuery({
+    queryKey: ['admin', 'audit', term],
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam }) => api<AuditRow[]>(`/api/admin/audit?size=${AUDIT_PAGE}${pageParam ? `&before=${pageParam}` : ''}${term ? `&q=${encodeURIComponent(term)}` : ''}`),
+    getNextPageParam: last => (last.length < AUDIT_PAGE ? null : last[last.length - 1].id),
+  })
+  const list = (q.data?.pages ?? []).flat()
   return (
     <Card>
       <div className="mb-4 flex items-center gap-3">
-        <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input className={`${inputCls} pl-9`} placeholder="Cerca persona o azione" value={s} onChange={e => setS(e.target.value)} /></div>
-        <span className="text-xs text-muted">Ultime 300 operazioni</span>
+        <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input className={`${inputCls} pl-9`} placeholder="Cerca persona o dettaglio" value={s} onChange={e => setS(e.target.value)} /></div>
+        <span className="text-xs text-muted">{list.length} operazioni{q.hasNextPage ? ' (ce ne sono altre)' : ''}</span>
       </div>
+      {q.data && !list.length && <p className="py-6 text-center text-sm text-muted">Nessuna operazione trovata.</p>}
       <ul className="divide-y divide-[var(--border)]">
         {list.map(e => (
           <li key={e.id} className="flex flex-wrap items-baseline gap-x-2 py-2.5 text-sm">
@@ -300,6 +311,11 @@ function AuditTab() {
           </li>
         ))}
       </ul>
+      {q.hasNextPage && (
+        <div className="mt-4 flex justify-center">
+          <Button onClick={() => q.fetchNextPage()} disabled={q.isFetchingNextPage}>{q.isFetchingNextPage ? 'Caricamento…' : 'Carica altre operazioni'}</Button>
+        </div>
+      )}
     </Card>
   )
 }

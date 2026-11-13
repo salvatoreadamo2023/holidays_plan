@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarRange, CheckCheck, Command, Home, KeyRound, ListChecks, LogOut, Moon, Plus, Settings, Sun } from 'lucide-react'
+import { BarChart3, CalendarRange, CheckCheck, Command, Home, KeyRound, ListChecks, LogOut, Moon, Plus, Settings, Sun } from 'lucide-react'
 import clsx from 'clsx'
 import { isAdmin, isManager, useAuth } from '../lib/auth'
 import { useUi } from '../lib/ui'
@@ -50,7 +50,7 @@ export function Layout() {
     { to: '/calendario', label: 'Calendario', icon: CalendarRange },
     { to: '/richieste', label: 'Richieste', icon: ListChecks },
     ...(isManager(user) ? [{ to: '/approvazioni', label: 'Approvazioni', icon: CheckCheck, badge: count }] : []),
-    ...(isAdmin(user) ? [{ to: '/admin', label: 'Admin', icon: Settings }] : []),
+    ...(isAdmin(user) ? [{ to: '/statistiche', label: 'Statistiche', icon: BarChart3 }, { to: '/admin', label: 'Admin', icon: Settings }] : []),
   ]
 
   return (

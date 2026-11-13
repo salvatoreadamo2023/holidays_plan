@@ -10,6 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,10 +37,31 @@ public class AuditController {
     public record AuditView(Long id, Instant createdAt, String action, String actorName, Long requestId,
                             String ownerName, String requestType, LocalDate startDate, LocalDate endDate, String detail) {}
 
+    static final int DEFAULT_SIZE = 50, MAX_SIZE = 200;
+
+    /**
+     * Storico a pagine, dalla operazione piu' recente. Per la pagina successiva si passa before = id dell'ultima riga
+     * ricevuta; se arrivano meno di size righe non ce ne sono altre. q cerca nel nome delle persone e nel dettaglio.
+     */
     @GetMapping
     @Transactional(readOnly = true)
-    public List<AuditView> list() {
-        List<AuditEvent> events = audit.findTop300ByOrderByCreatedAtDesc();
+    public List<AuditView> list(@RequestParam(required = false) Long before, @RequestParam(required = false) Integer size,
+                                @RequestParam(required = false) String q) {
+        int n = size == null ? DEFAULT_SIZE : Math.max(1, Math.min(MAX_SIZE, size));
+        long cursor = before == null ? Long.MAX_VALUE : before;
+        Pageable page = PageRequest.of(0, n);
+        List<AuditEvent> events;
+        if (q == null || q.isBlank()) {
+            events = audit.page(cursor, page);
+        } else {
+            String needle = q.trim().toLowerCase(java.util.Locale.ROOT);
+            List<Long> ids = new java.util.ArrayList<>(users.findAll().stream()
+                .filter(u -> u.getFullName().toLowerCase(java.util.Locale.ROOT).contains(needle)
+                    || u.getUsername().toLowerCase(java.util.Locale.ROOT).contains(needle))
+                .map(User::getId).toList());
+            ids.add(-1L); // la lista non puo' essere vuota
+            events = audit.search(cursor, "%" + needle.replace("%", "").replace("_", "") + "%", ids, page);
+        }
         Set<Long> userIds = events.stream().map(AuditEvent::getActorId).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Long> reqIds = events.stream().map(AuditEvent::getRequestId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, AbsenceRequest> reqs = requests.findAllById(reqIds).stream()

@@ -321,7 +321,24 @@ class SecurityAndFlowTest {
 
     @Test
     void storicoSoloAdmin() throws Exception {
-        mvc.perform(get("/api/admin/audit").header("Authorization", token("admin"))).andExpect(status().isOk());
+        String admin = token("admin");
+        mvc.perform(get("/api/admin/audit").header("Authorization", admin)).andExpect(status().isOk());
+        // Paginazione: due pagine da 2 senza sovrapposizioni, in ordine dalla piu' recente
+        for (int i = 0; i < 3; i++) createFerie(token("sara"), freshMonday(), freshMonday().minusWeeks(1));
+        JsonNode p1 = json.readTree(mvc.perform(get("/api/admin/audit").param("size", "2").header("Authorization", admin))
+            .andReturn().getResponse().getContentAsString());
+        assertThat(p1.size()).isEqualTo(2);
+        long last = p1.get(1).get("id").asLong();
+        assertThat(p1.get(0).get("id").asLong()).isGreaterThan(last);
+        JsonNode p2 = json.readTree(mvc.perform(get("/api/admin/audit").param("size", "2").param("before", String.valueOf(last))
+            .header("Authorization", admin)).andReturn().getResponse().getContentAsString());
+        assertThat(p2.size()).isEqualTo(2);
+        assertThat(p2.get(0).get("id").asLong()).isLessThan(last);
+        // Ricerca per persona
+        JsonNode found = json.readTree(mvc.perform(get("/api/admin/audit").param("q", "sara").header("Authorization", admin))
+            .andReturn().getResponse().getContentAsString());
+        assertThat(found.size()).isGreaterThan(0);
+        for (JsonNode e : found) assertThat((e.get("actorName").asText() + " " + e.path("ownerName").asText()).toLowerCase()).contains("sara");
         mvc.perform(get("/api/admin/audit").header("Authorization", token("pm"))).andExpect(status().isForbidden());
     }
 
@@ -470,5 +487,68 @@ class SecurityAndFlowTest {
         // Si toglie senza chiedere
         mvc.perform(post("/api/requests/" + id + "/cancel").header("Authorization", token("sara")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    private JsonNode stats(String admin, int year) throws Exception {
+        return json.readTree(mvc.perform(get("/api/admin/stats").param("year", String.valueOf(year)).header("Authorization", admin))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
+    private static java.math.BigDecimal month(JsonNode v, String type, int m) {
+        return v.get("types").get(type).get("months").get(m - 1).decimalValue();
+    }
+
+    private static java.math.BigDecimal total(JsonNode v, String type) {
+        return v.get("types").get(type).get("total").decimalValue();
+    }
+
+    private void onBehalf(String admin, long userId, Map<String, Object> body) throws Exception {
+        Map<String, Object> b = new java.util.HashMap<>(body);
+        b.put("forUserId", userId);
+        mvc.perform(post("/api/requests").header("Authorization", admin).contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(b))).andExpect(status().isCreated());
+    }
+
+    @Test
+    void statistiche_soloAdmin_eConteggiSpezzatiSuMesiEAnni() throws Exception {
+        mvc.perform(get("/api/admin/stats").header("Authorization", token("pm"))).andExpect(status().isForbidden());
+        String admin = token("admin");
+        // Persona nuova, senza altre assenze: i conteggi si confrontano prima/dopo
+        mvc.perform(post("/api/admin/users").header("Authorization", admin).contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(Map.of("username", "stats.test", "email", "stats@example.com",
+                "fullName", "Stats Test", "password", "Iniziale-2026!", "role", "USER", "areaId", 1)))).andExpect(status().isCreated());
+        long elena = userId(admin, "stats.test");
+        int y = LocalDate.now().getYear();
+        JsonNode a0 = stats(admin, y), b0 = stats(admin, y + 1);
+
+        // A cavallo d'anno: 30-31 dic (2 gg) | 1 gen festivo, 2-3 weekend | 4 gen (1 gg)
+        onBehalf(admin, elena, Map.of("type", "FERIE", "startDate", y + "-12-30", "endDate", (y + 1) + "-01-04"));
+        // A cavallo di mese nell'anno dopo: gio 28 e ven 29 gen | lun 1 e mar 2 feb (date del 2027)
+        LocalDate s = LocalDate.of(y + 1, 1, 28);
+        onBehalf(admin, elena, Map.of("type", "GENERAL_LEAVE", "leaveReason", "LEGGE_104", "startDate", s.toString(), "endDate", s.plusDays(5).toString()));
+        // Permesso parziale di 3 ore e una giornata presso cliente
+        onBehalf(admin, elena, Map.of("type", "PERMESSO", "hours", 3, "startDate", (y + 1) + "-02-10", "endDate", (y + 1) + "-02-10"));
+        onBehalf(admin, elena, Map.of("type", "CLIENT_OFFICE", "startDate", (y + 1) + "-02-11", "endDate", (y + 1) + "-02-11"));
+
+        JsonNode a1 = stats(admin, y), b1 = stats(admin, y + 1);
+        assertThat(month(a1, "FERIE", 12).subtract(month(a0, "FERIE", 12))).isEqualByComparingTo("2");
+        assertThat(month(b1, "FERIE", 1).subtract(month(b0, "FERIE", 1))).isEqualByComparingTo("1");
+        assertThat(total(a1, "FERIE").subtract(total(a0, "FERIE"))).isEqualByComparingTo("3");
+        assertThat(month(b1, "GENERAL_LEAVE", 1).subtract(month(b0, "GENERAL_LEAVE", 1))).isEqualByComparingTo("2");
+        assertThat(month(b1, "GENERAL_LEAVE", 2).subtract(month(b0, "GENERAL_LEAVE", 2))).isEqualByComparingTo("2");
+        assertThat(month(b1, "PERMESSO", 2).subtract(month(b0, "PERMESSO", 2))).isEqualByComparingTo("3");
+        assertThat(month(b1, "CLIENT_OFFICE", 2).subtract(month(b0, "CLIENT_OFFICE", 2))).isEqualByComparingTo("1");
+        assertThat(b1.get("years").toString()).contains(String.valueOf(y + 1));
+        // Tipologia e team
+        boolean found = false;
+        for (JsonNode r : b1.get("reasons")) if (r.get("reason").asText().equals("LEGGE_104")) {
+            found = true; assertThat(r.get("series").get("months").get(1).decimalValue()).isGreaterThanOrEqualTo(new java.math.BigDecimal("2"));
+        }
+        assertThat(found).isTrue();
+        // Filtro per tipologia: con reason=MALATTIA la Legge 104 non conta
+        JsonNode onlySick = json.readTree(mvc.perform(get("/api/admin/stats").param("year", String.valueOf(y + 1)).param("reason", "MALATTIA")
+            .header("Authorization", admin)).andReturn().getResponse().getContentAsString());
+        assertThat(month(onlySick, "GENERAL_LEAVE", 2)).isLessThan(month(b1, "GENERAL_LEAVE", 2));
+        assertThat(b1.get("people").asInt()).isGreaterThan(5);
     }
 }
