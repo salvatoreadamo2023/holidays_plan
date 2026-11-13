@@ -1,8 +1,8 @@
 // Service worker minimo: rende l'app installabile e apribile anche con rete instabile.
 // Le chiamate /api non vengono mai messe in cache (dati personali e sempre aggiornati).
-const CACHE = 'ferie-shell-v1'
+const CACHE = 'ferie-shell-v2'
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/', '/manifest.webmanifest', '/favicon.svg'])))
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/', '/manifest.webmanifest', '/favicon.png'])))
   self.skipWaiting()
 })
 self.addEventListener('activate', e => {

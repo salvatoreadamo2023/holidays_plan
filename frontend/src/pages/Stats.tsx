@@ -23,11 +23,11 @@ type Period = 'M' | 'Y' | 'T'
 const TYPES: T[] = ['FERIE', 'PERMESSO', 'GENERAL_LEAVE', 'CLIENT_OFFICE', 'BUSINESS_TRIP']
 const ABSENCE: T[] = ['FERIE', 'PERMESSO', 'GENERAL_LEAVE']
 const META: Record<T, { short: string; unit: string; icon: typeof Plane; color: string }> = {
-  FERIE: { short: 'Ferie', unit: 'gg', icon: Plane, color: '#8b5cf6' },
+  FERIE: { short: 'Ferie', unit: 'gg', icon: Plane, color: '#e31937' },
   PERMESSO: { short: 'Permessi', unit: 'ore', icon: Clock, color: '#f59e0b' },
-  GENERAL_LEAVE: { short: 'General leave', unit: 'gg', icon: Stethoscope, color: '#f43f5e' },
+  GENERAL_LEAVE: { short: 'General leave', unit: 'gg', icon: Stethoscope, color: '#5236ab' },
   CLIENT_OFFICE: { short: 'CO · Cliente', unit: 'gg', icon: Building2, color: '#10b981' },
-  BUSINESS_TRIP: { short: 'BT · Trasferta', unit: 'gg', icon: Briefcase, color: '#84cc16' },
+  BUSINESS_TRIP: { short: 'BT · Trasferta', unit: 'gg', icon: Briefcase, color: '#0ea5e9' },
 }
 const sum = (a: number[]) => a.reduce((x, y) => x + Number(y), 0)
 /** Permessi in giorni: 8 ore = 1 giorno. */

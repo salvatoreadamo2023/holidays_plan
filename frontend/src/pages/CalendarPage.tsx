@@ -119,7 +119,7 @@ export function CalendarPage() {
                       {format(parseISO(d.date), 'd')}
                     </span>
                     <span className="mt-1 h-1 w-5 overflow-hidden rounded-full bg-[var(--grid)]">
-                      <motion.span className="block h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-400"
+                      <motion.span className="block h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
                         initial={{ width: 0 }} animate={{ width: `${(absentPerDay[i] / maxAbsent) * 100}%` }} />
                     </span>
                   </div>

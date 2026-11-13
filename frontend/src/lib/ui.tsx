@@ -11,7 +11,7 @@ const Ctx = createContext<UiCtx | null>(null)
 
 const readTheme = () => {
   try { const t = localStorage.getItem('hp.theme'); if (t) return t === 'dark' } catch { /* ignore */ }
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true
+  return false
 }
 
 export function UiProvider({ children }: { children: ReactNode }) {

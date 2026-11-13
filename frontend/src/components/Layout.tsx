@@ -21,10 +21,10 @@ export function Aurora() {
 export function Logo() {
   return (
     <div className="flex items-center gap-2.5">
-      <img src="/favicon.svg" alt="" className="h-9 w-9 rounded-xl shadow-lg shadow-violet-500/30" />
+      <img src="/cgi-logo.png" alt="CGI" className="h-9 w-9 rounded-xl shadow-lg shadow-violet-500/30" />
       <div className="leading-tight">
-        <div className="font-display text-lg font-bold tracking-tight">Ferie</div>
-        <div className="text-[11px] text-muted">Holidays Plan</div>
+        <div className="font-display text-lg font-bold tracking-tight">{t('Gestione Ferie')}</div>
+        <div className="text-[11px] text-muted">CGI</div>
       </div>
     </div>
   )

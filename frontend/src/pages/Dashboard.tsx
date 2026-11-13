@@ -38,7 +38,7 @@ export function Dashboard() {
 
       {/* Hero: conto alla rovescia */}
       <motion.div variants={rise}>
-        <div className="relative overflow-hidden rounded-[2rem] p-6 text-white shadow-2xl md:p-8" style={{ background: 'linear-gradient(120deg,#7c3aed,#4f46e5 45%,#0891b2)' }}>
+        <div className="relative overflow-hidden rounded-[2rem] p-6 text-white shadow-2xl md:p-8" style={{ background: 'linear-gradient(120deg,#e31937,#8e2a7e 55%,#5236ab)' }}>
           <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/15 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-fuchsia-400/30 blur-3xl" />
           <motion.div className="pointer-events-none absolute right-8 top-6 hidden text-7xl md:block" animate={{ y: [0, -10, 0], rotate: [0, 4, 0] }} transition={{ repeat: Infinity, duration: 5 }}>🏝️</motion.div>
@@ -68,10 +68,10 @@ export function Dashboard() {
             {d && (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {[
-                  { label: t('Ferie'), value: d.trend.leaveDays, unit: t('giorni'), pending: d.trend.leavePending, icon: <Plane size={18} />, cls: 'from-violet-500 to-indigo-500' },
+                  { label: t('Ferie'), value: d.trend.leaveDays, unit: t('giorni'), pending: d.trend.leavePending, icon: <Plane size={18} />, cls: 'from-violet-500 to-fuchsia-500' },
                   { label: t('Permessi'), value: d.trend.permitHours, unit: t('ore'), pending: d.trend.permitPending, icon: <Clock size={18} />, cls: 'from-amber-500 to-rose-500' },
-                  { label: 'General leave', value: d.trend.sickDays, unit: t('giorni'), pending: 0, icon: <Thermometer size={18} />, cls: 'from-rose-500 to-pink-500' },
-                  { label: t('Assente'), value: d.trend.absenceDays, unit: t('giorni in tutto'), pending: 0, icon: <CalendarOff size={18} />, cls: 'from-cyan-500 to-sky-600' },
+                  { label: 'General leave', value: d.trend.sickDays, unit: t('giorni'), pending: 0, icon: <Thermometer size={18} />, cls: 'from-fuchsia-500 to-fuchsia-400' },
+                  { label: t('Assente'), value: d.trend.absenceDays, unit: t('giorni in tutto'), pending: 0, icon: <CalendarOff size={18} />, cls: 'from-slate-500 to-slate-800' },
                 ].map(t => (
                   <div key={t.label} className="rounded-2xl border border-soft p-4">
                     <div className={`mb-3 grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br ${t.cls} text-white`}>{t.icon}</div>
