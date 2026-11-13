@@ -12,11 +12,13 @@ public enum AbsenceType {
     /** CO - presso il cliente: non e' un'assenza, registrata subito e visibile a tutti. */
     CLIENT_OFFICE,
     /** BT - trasferta: non e' un'assenza, registrata subito e visibile a tutti. */
-    BUSINESS_TRIP;
+    BUSINESS_TRIP,
+    /** TH - ferie ipotetiche: solo un'idea di pianificazione, non si approva e non conta nulla. Si puo' trasformare in una richiesta di ferie. */
+    TENTATIVE;
 
-    /** Lavoro fuori sede: non conta come assenza, nessuna approvazione, visibile a tutti. */
+    /** Non e' un'assenza (CO, BT e TH): nessuna approvazione, visibile a tutti, si toglie in autonomia, non entra nei conteggi. */
     public boolean isPresence() {
-        return this == CLIENT_OFFICE || this == BUSINESS_TRIP;
+        return this == CLIENT_OFFICE || this == BUSINESS_TRIP || this == TENTATIVE;
     }
 
     /** Registrata subito, senza approvazione. */

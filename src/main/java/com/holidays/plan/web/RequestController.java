@@ -79,6 +79,12 @@ public class RequestController {
         return views.one(service.requestCancel(currentUser.get(), id, d == null ? null : d.note()));
     }
 
+    @PostMapping("/{id}/convert")
+    @Transactional
+    public RequestView convert(@PathVariable Long id) {
+        return views.one(service.convertTentative(currentUser.get(), id));
+    }
+
     @PostMapping("/{id}/cancel/accept")
     @Transactional
     public RequestView acceptCancel(@PathVariable Long id, @Valid @RequestBody(required = false) Decision d) {

@@ -6,6 +6,7 @@ import { Toaster } from 'sonner'
 import './index.css'
 import { AuthProvider, isAdmin, isManager, useAuth } from './lib/auth'
 import { UiProvider, useUi } from './lib/ui'
+import { I18nProvider } from './lib/i18n'
 import { Layout } from './components/Layout'
 import { Login } from './pages/Login'
 import { ChangePassword } from './pages/ChangePassword'
@@ -53,7 +54,9 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <UiProvider>
           <AuthProvider>
-            <AppRoutes />
+            <I18nProvider>
+              <AppRoutes />
+            </I18nProvider>
           </AuthProvider>
         </UiProvider>
       </BrowserRouter>

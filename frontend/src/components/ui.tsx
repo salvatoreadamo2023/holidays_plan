@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import type { ReactNode } from 'react'
 import { avatarHue, initials, statusLabel, typeEmoji, typeLabel } from '../lib/format'
 import type { AbsenceType, Status } from '../lib/types'
+import { t } from '../lib/i18n'
 
 export function Avatar({ name, size = 36, ring = false }: { name: string; size?: number; ring?: boolean }) {
   const h = avatarHue(name)
@@ -106,7 +107,7 @@ export function Modal({ open, onClose, title, children, side = false }:
           >
             <div className="flex items-center justify-between border-b border-soft px-6 py-4">
               <h3 className="font-display text-lg font-semibold">{title}</h3>
-              <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-black/5 dark:hover:bg-white/10" aria-label="Chiudi"><X size={18} /></button>
+              <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-black/5 dark:hover:bg-white/10" aria-label={t('Chiudi')}><X size={18} /></button>
             </div>
             <div className="scrollbar-thin flex-1 overflow-y-auto px-6 py-5">{children}</div>
           </motion.div>

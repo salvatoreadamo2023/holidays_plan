@@ -74,6 +74,7 @@ public class StatsService {
     public StatsView stats(int year, LeaveReason reason) {
         LocalDate today = LocalDate.now(clock.withZone(ClockConfig.ZONE));
         List<AbsenceRequest> list = requests.findByStatusIn(RequestStatus.ACTIVE).stream()
+            .filter(r -> r.getType() != AbsenceType.TENTATIVE)
             .filter(r -> reason == null || r.getType() != AbsenceType.GENERAL_LEAVE || r.getLeaveReason() == reason)
             .toList();
 

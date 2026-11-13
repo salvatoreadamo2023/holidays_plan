@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth'
 import { Aurora, Logo } from '../components/Layout'
 import { inputCls } from '../components/ui'
 import { typeEmoji } from '../lib/format'
+import { LangToggle, t } from '../lib/i18n'
 
 export function Login() {
   const { login } = useAuth()
@@ -32,11 +33,11 @@ export function Login() {
       </div>
       <motion.div initial={{ opacity: 0, y: 24, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', damping: 24 }}
         className="glass-strong relative z-10 w-full max-w-md rounded-[2rem] p-8 shadow-2xl">
-        <Logo />
+        <div className="flex items-center justify-between"><Logo /><LangToggle className="grid h-9 w-9 place-items-center rounded-xl border border-soft text-muted hover:text-[var(--text)]" /></div>
         <h1 className="mt-8 font-display text-4xl font-bold leading-tight tracking-tight">
-          Addio Excel.<br /><span className="gradient-text">Ciao ferie.</span>
+          {t('Addio Excel.')}<br /><span className="gradient-text">{t('Ciao ferie.')}</span>
         </h1>
-        <p className="mt-3 text-sm text-muted">Chiedi, approva e pianifica le assenze del tuo team in pochi secondi.</p>
+        <p className="mt-3 text-sm text-muted">{t('Chiedi, approva e pianifica le assenze del tuo team in pochi secondi.')}</p>
         <form onSubmit={submit} className="mt-8 space-y-4">
           <div className="relative">
             <User size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
@@ -47,7 +48,7 @@ export function Login() {
             <input className={`${inputCls} pl-10`} type="password" placeholder="Password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required />
           </div>
           <button disabled={busy} className="btn-primary group flex w-full items-center justify-center gap-2 rounded-xl py-3.5 font-semibold transition active:scale-[.98] disabled:opacity-60">
-            {busy ? 'Accesso…' : 'Entra'} <ArrowRight size={18} className="transition group-hover:translate-x-1" />
+            {busy ? t('Accesso…') : t('Entra')} <ArrowRight size={18} className="transition group-hover:translate-x-1" />
           </button>
         </form>
       </motion.div>

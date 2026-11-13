@@ -47,6 +47,13 @@ public class RequestService {
 
     private record Computed(BigDecimal amount, String unit) {}
 
+    /** Le TH non bloccano le richieste vere; una TH invece non si sovrappone a nulla di gia' presente. */
+    private boolean overlaps(User user, CreateRequest in) {
+        return in.type() == AbsenceType.TENTATIVE
+            ? requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING)
+            : requests.existsOverlapForUserExcept(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING, AbsenceType.TENTATIVE);
+    }
+
     private static void requireReason(CreateRequest in) {
         if (in.type() == AbsenceType.GENERAL_LEAVE && in.leaveReason() == null) throw ApiException.bad("Scegli la tipologia");
     }
@@ -60,11 +67,11 @@ public class RequestService {
         if (onBehalf) {
             if (in.startDate().isBefore(today.minusDays(ON_BEHALF_BACKDATE_DAYS)))
                 throw ApiException.bad("Si puo' inserire un'assenza al massimo un anno indietro");
-        } else if (in.type().isAutoRecorded()) {
+        } else if (in.type().isAutoRecorded() && in.type() != AbsenceType.TENTATIVE) {
             if (in.startDate().isBefore(today.minusDays(SICK_BACKDATE_DAYS)))
                 throw ApiException.bad("Si puo' registrare al massimo " + SICK_BACKDATE_DAYS + " giorni indietro");
         } else if (in.startDate().isBefore(today)) {
-            throw ApiException.bad("Non si possono chiedere ferie o permessi nel passato");
+            throw ApiException.bad(in.type() == AbsenceType.TENTATIVE ? "Le ferie ipotetiche si mettono solo da oggi in avanti" : "Non si possono chiedere ferie o permessi nel passato");
         }
         if (in.startDate().isAfter(today.plusYears(1).withMonth(12).withDayOfMonth(31)))
             throw ApiException.bad("Data troppo lontana nel futuro");
@@ -78,7 +85,7 @@ public class RequestService {
                 if (!calendar.isWorkingDay(in.startDate())) throw ApiException.bad("Il giorno scelto non e' lavorativo");
                 return new Computed(in.hours(), "ore");
             }
-            case FERIE, GENERAL_LEAVE, CLIENT_OFFICE, BUSINESS_TRIP -> {
+            case FERIE, GENERAL_LEAVE, CLIENT_OFFICE, BUSINESS_TRIP, TENTATIVE -> {
                 BigDecimal days = calendar.workingDays(in.startDate(), in.endDate());
                 if (days.signum() == 0) throw ApiException.bad("Nel periodo scelto non ci sono giorni lavorativi");
                 return new Computed(days, "giorni");
@@ -93,7 +100,7 @@ public class RequestService {
         boolean onBehalf = user != actor;
         Computed c = validateAndCompute(user, in, onBehalf);
         List<String> warnings = new ArrayList<>();
-        if (requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING))
+        if (overlaps(user, in))
             warnings.add(onBehalf ? user.getFullName() + " ha gia' un'assenza in quei giorni" : "Hai gia' una richiesta in quei giorni");
         List<String> colleagues = colleaguesAbsent(user, in.startDate(), in.endDate());
         return new Preview(c.amount(), c.unit(), null, colleagues, warnings);
@@ -114,7 +121,7 @@ public class RequestService {
         if (user != actor) return createOnBehalf(actor, user, in);
         Computed c = validateAndCompute(user, in, false);
         requireReason(in);
-        if (requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING))
+        if (overlaps(user, in))
             throw ApiException.conflict("Hai gia' una richiesta che si sovrappone a queste date");
         long pending = in.type().isAutoRecorded() ? 0 : requests.findByUser(user.getId()).stream()
             .filter(r -> r.getStatus() == RequestStatus.PENDING).count();
@@ -168,7 +175,7 @@ public class RequestService {
     private AbsenceRequest createOnBehalf(User actor, User user, CreateRequest in) {
         Computed c = validateAndCompute(user, in, true);
         requireReason(in);
-        if (requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING))
+        if (overlaps(user, in))
             throw ApiException.conflict(user.getFullName() + " ha gia' un'assenza che si sovrappone a queste date");
         AbsenceRequest r = new AbsenceRequest();
         r.setUser(user);
@@ -254,7 +261,7 @@ public class RequestService {
         if (r.getStatus() != RequestStatus.APPROVED) throw ApiException.conflict("Si possono annullare solo richieste approvate");
         if (r.getEndDate().isBefore(LocalDate.now(clock))) throw ApiException.conflict("Il periodo e' gia' trascorso");
         if (r.getType().isPresence()) {
-            // CO e BT si tolgono in autonomia, come si mettono.
+            // CO, BT e TH si tolgono in autonomia, come si mettono.
             r.setStatus(RequestStatus.CANCELLED);
             r.setDecidedAt(Instant.now(clock));
             audit.log(actor.getId(), r.getId(), "CANCELLED", "Tolta dall'interessato");
@@ -270,6 +277,20 @@ public class RequestService {
             notifier.cancelRequested(r);
         }
         return r;
+    }
+
+    /** Trasforma una TH (ferie ipotetiche) in una vera richiesta di ferie, con le stesse date: la TH sparisce. */
+    @Transactional
+    public AbsenceRequest convertTentative(User actor, Long id) {
+        AbsenceRequest th = load(id);
+        if (!Objects.equals(th.getUser().getId(), actor.getId())) throw ApiException.forbidden();
+        if (th.getType() != AbsenceType.TENTATIVE || th.getStatus() != RequestStatus.APPROVED)
+            throw ApiException.conflict("Si possono trasformare solo ferie ipotetiche (TH) attive");
+        th.setStatus(RequestStatus.CANCELLED);
+        th.setDecidedAt(Instant.now(clock));
+        requests.saveAndFlush(th);
+        audit.log(actor.getId(), th.getId(), "CONVERTED", "TH trasformata in richiesta di ferie");
+        return create(actor, new CreateRequest(AbsenceType.FERIE, th.getStartDate(), th.getEndDate(), false, null, th.getNote(), null, null));
     }
 
     @Transactional

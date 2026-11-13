@@ -1,9 +1,8 @@
-import { eachDayOfInterval, endOfYear, getDay, startOfYear, format, isToday } from 'date-fns'
-import { it } from 'date-fns/locale'
+import { eachDayOfInterval, endOfYear, getDay, startOfYear, isToday } from 'date-fns'
 import { motion } from 'framer-motion'
 import clsx from 'clsx'
 import type { RequestView } from '../lib/types'
-import { iso, typeLabel } from '../lib/format'
+import { fmt, iso, typeLabel } from '../lib/format'
 
 /** "Il tuo anno": una griglia stile contributi, ogni quadrato un giorno. */
 export function YearHeatmap({ year, requests, holidays }: { year: number; requests: RequestView[]; holidays?: Set<string> }) {
@@ -39,7 +38,7 @@ export function YearHeatmap({ year, requests, holidays }: { year: number; reques
                     key={di}
                     initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: wi * 0.008 }}
-                    title={`${format(d, 'EEEE d MMMM', { locale: it })}${r ? ' · ' + typeLabel[r.type] : ''}`}
+                    title={`${fmt(d, 'EEEE d MMMM')}${r ? ' · ' + typeLabel[r.type] : ''}`}
                     className={clsx('aspect-square rounded-[3px]',
                       r ? `bar-${r.type}` : weekend ? 'bg-[var(--weekend)]' : 'bg-[var(--grid)]',
                       r?.status === 'PENDING' && 'opacity-50',
@@ -51,7 +50,7 @@ export function YearHeatmap({ year, requests, holidays }: { year: number; reques
           ))}
         </div>
         <div className="relative mt-2 h-4 text-[11px] text-muted">
-          {['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'].map((m, i) => (
+          {Array.from({ length: 12 }, (_, i) => fmt(new Date(year, i, 1), 'MMM').replace('.', '')).map((m, i) => (
             <span key={m} className="absolute" style={{ left: `${(monthStarts[i] / weeks.length) * 100}%` }}>{m}</span>
           ))}
         </div>

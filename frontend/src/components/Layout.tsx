@@ -12,6 +12,7 @@ import type { RequestView } from '../lib/types'
 import { Avatar } from './ui'
 import { CommandPalette } from './CommandPalette'
 import { NewRequestDrawer } from './NewRequestDrawer'
+import { LangToggle, t } from '../lib/i18n'
 
 export function Aurora() {
   return <div className="aurora" aria-hidden><span /><span /><span /></div>
@@ -46,11 +47,11 @@ export function Layout() {
   const count = toApprove.data?.length ?? 0
 
   const links = [
-    { to: '/', label: 'Home', icon: Home, end: true },
-    { to: '/calendario', label: 'Calendario', icon: CalendarRange },
-    { to: '/richieste', label: 'Richieste', icon: ListChecks },
-    ...(isManager(user) ? [{ to: '/approvazioni', label: 'Approvazioni', icon: CheckCheck, badge: count }] : []),
-    ...(isAdmin(user) ? [{ to: '/statistiche', label: 'Statistiche', icon: BarChart3 }, { to: '/admin', label: 'Admin', icon: Settings }] : []),
+    { to: '/', label: t('Home'), icon: Home, end: true },
+    { to: '/calendario', label: t('Calendario'), icon: CalendarRange },
+    { to: '/richieste', label: t('Richieste'), icon: ListChecks },
+    ...(isManager(user) ? [{ to: '/approvazioni', label: t('Approvazioni'), icon: CheckCheck, badge: count }] : []),
+    ...(isAdmin(user) ? [{ to: '/statistiche', label: t('Statistiche'), icon: BarChart3 }, { to: '/admin', label: 'Admin', icon: Settings }] : []),
   ]
 
   return (
@@ -59,7 +60,7 @@ export function Layout() {
       <aside className="glass fixed inset-y-3 left-3 z-30 hidden w-64 flex-col rounded-3xl p-4 lg:flex">
         <Logo />
         <button onClick={() => openRequest()} className="btn-primary mt-6 flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold transition active:scale-95">
-          <Plus size={18} /> Nuova richiesta
+          <Plus size={18} /> {t('Nuova richiesta')}
         </button>
         <nav className="mt-6 flex flex-col gap-1">
           {links.map(l => (
@@ -77,18 +78,21 @@ export function Layout() {
             </NavLink>
           ))}
         </nav>
-        <button onClick={() => setPaletteOpen(true)} className="mt-4 flex items-center gap-2 rounded-xl border border-soft px-3 py-2 text-xs text-muted hover:text-[var(--text)]">
-          <Command size={14} /> Cerca un comando <kbd className="ml-auto rounded-md border border-soft px-1.5 py-0.5 font-sans">Ctrl K</kbd>
+        <div className="mt-4 flex gap-2">
+        <button onClick={() => setPaletteOpen(true)} className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-soft px-3 py-2 text-xs text-muted hover:text-[var(--text)]">
+          <Command size={14} className="shrink-0" /> <span className="truncate">{t('Cerca un comando')}</span> <kbd className="ml-auto shrink-0 whitespace-nowrap rounded-md border border-soft px-1.5 py-0.5 font-sans">Ctrl K</kbd>
         </button>
+        <LangToggle className="grid w-10 place-items-center rounded-xl border border-soft text-muted hover:text-[var(--text)]" />
+        </div>
         <div className="mt-auto flex items-center gap-3 rounded-2xl border border-soft p-3">
           {user && <Avatar name={user.fullName} size={38} />}
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold">{user?.fullName}</div>
             <div className="truncate text-[11px] text-muted">{user && roleLabel[user.role]}{user?.areaName ? ` · ${user.areaName}` : ''}</div>
           </div>
-          <button onClick={toggleDark} className="rounded-lg p-1.5 text-muted hover:text-[var(--text)]" aria-label="Cambia tema">{dark ? <Sun size={16} /> : <Moon size={16} />}</button>
-          <Link to="/password" className="rounded-lg p-1.5 text-muted hover:text-[var(--text)]" aria-label="Cambia password" title="Cambia password"><KeyRound size={16} /></Link>
-          <button onClick={logout} className="rounded-lg p-1.5 text-muted hover:text-rose-500" aria-label="Esci"><LogOut size={16} /></button>
+          <button onClick={toggleDark} className="rounded-lg p-1.5 text-muted hover:text-[var(--text)]" aria-label={t('Cambia tema')}>{dark ? <Sun size={16} /> : <Moon size={16} />}</button>
+          <Link to="/password" className="rounded-lg p-1.5 text-muted hover:text-[var(--text)]" aria-label={t('Cambia password')} title={t('Cambia password')}><KeyRound size={16} /></Link>
+          <button onClick={logout} className="rounded-lg p-1.5 text-muted hover:text-rose-500" aria-label={t('Esci')}><LogOut size={16} /></button>
         </div>
       </aside>
 
@@ -96,9 +100,10 @@ export function Layout() {
       <header className="glass sticky top-0 z-30 flex items-center justify-between px-4 py-3 lg:hidden">
         <Logo />
         <div className="flex items-center gap-1">
-          <button onClick={toggleDark} className="rounded-lg p-2" aria-label="Cambia tema">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
-          <Link to="/password" className="rounded-lg p-2" aria-label="Cambia password"><KeyRound size={18} /></Link>
-          <button onClick={logout} className="rounded-lg p-2" aria-label="Esci"><LogOut size={18} /></button>
+          <LangToggle className="grid h-9 w-9 place-items-center rounded-lg" />
+          <button onClick={toggleDark} className="rounded-lg p-2" aria-label={t('Cambia tema')}>{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
+          <Link to="/password" className="rounded-lg p-2" aria-label={t('Cambia password')}><KeyRound size={18} /></Link>
+          <button onClick={logout} className="rounded-lg p-2" aria-label={t('Esci')}><LogOut size={18} /></button>
         </div>
       </header>
 
@@ -117,7 +122,7 @@ export function Layout() {
             <l.icon size={20} />{l.label}
           </NavLink>
         ))}
-        <button onClick={() => openRequest()} className="btn-primary -mt-8 grid h-14 w-14 place-items-center rounded-2xl shadow-xl" aria-label="Nuova richiesta"><Plus size={24} /></button>
+        <button onClick={() => openRequest()} className="btn-primary -mt-8 grid h-14 w-14 place-items-center rounded-2xl shadow-xl" aria-label={t('Nuova richiesta')}><Plus size={24} /></button>
         {links.slice(2, 4).map(l => (
           <NavLink key={l.to} to={l.to} className={({ isActive }) => clsx('relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 text-[10px] font-medium', isActive ? 'text-violet-500' : 'text-muted')}>
             <l.icon size={20} />{l.label}

@@ -8,6 +8,7 @@ import { needsCertificate, num, range, roleLabel, typeText } from '../lib/format
 import type { RequestView } from '../lib/types'
 import { Avatar, Button, Card, Empty, Field, inputCls, Modal, StatusChip, TypeIcon } from '../components/ui'
 import { Attachments } from '../components/Attachments'
+import { t } from '../lib/i18n'
 
 function Conflicts({ r }: { r: RequestView }) {
   // Chiede al calendario chi altro dell'area e' assente in quei giorni.
@@ -20,9 +21,9 @@ function Conflicts({ r }: { r: RequestView }) {
   return names.length ? (
     <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-300">
       <div className="flex -space-x-2">{names.slice(0, 5).map(n => <Avatar key={n} name={n} size={22} ring />)}</div>
-      {names.length} {names.length === 1 ? 'collega assente' : 'colleghi assenti'} nello stesso periodo
+      {t(names.length === 1 ? '{n} collega assente nello stesso periodo' : '{n} colleghi assenti nello stesso periodo', { n: names.length })}
     </div>
-  ) : <div className="text-xs text-emerald-600 dark:text-emerald-300">Nessuna sovrapposizione nell'area</div>
+  ) : <div className="text-xs text-emerald-600 dark:text-emerald-300">{t("Nessuna sovrapposizione nell'area")}</div>
 }
 type CalendarLike = { entries: { userId: number; status: string }[]; people: { id: number; fullName: string }[] }
 
@@ -40,7 +41,7 @@ export function Approvals() {
       return api(path, { method: 'POST', json: { note: note ?? '' } })
     },
     onSuccess: (_, v) => {
-      toast.success(v.ok ? `${v.r.status === 'CANCEL_REQUESTED' ? 'Annullamento confermato' : 'Approvata'} per ${v.r.user.fullName}` : 'Decisione registrata')
+      toast.success(v.ok ? t(v.r.status === 'CANCEL_REQUESTED' ? 'Annullamento confermato per {who}' : 'Approvata per {who}', { who: v.r.user.fullName }) : t('Decisione registrata'))
       setRejecting(null); setReason(''); qc.invalidateQueries()
     },
     onError: (e: Error) => toast.error(e.message),
@@ -61,13 +62,13 @@ export function Approvals() {
     <div className="mx-auto max-w-4xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Da approvare</h1>
-          <p className="mt-1 text-sm text-muted">Richieste delle persone che rientrano nella tua competenza.</p>
+          <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">{t('Da approvare')}</h1>
+          <p className="mt-1 text-sm text-muted">{t('Richieste delle persone che rientrano nella tua competenza.')}</p>
         </div>
-        <span className="hidden items-center gap-2 text-xs text-muted md:flex"><Keyboard size={14} /> <kbd className="rounded border border-soft px-1.5">A</kbd> approva · <kbd className="rounded border border-soft px-1.5">R</kbd> rifiuta</span>
+        <span className="hidden items-center gap-2 text-xs text-muted md:flex"><Keyboard size={14} /> <kbd className="rounded border border-soft px-1.5">A</kbd> {t('approva')} · <kbd className="rounded border border-soft px-1.5">R</kbd> {t('rifiuta')}</span>
       </header>
 
-      {q.data && list.length === 0 && <Card><Empty emoji="🎉" title="Inbox zero!" text="Non ci sono richieste in attesa. Ottimo lavoro." /></Card>}
+      {q.data && list.length === 0 && <Card><Empty emoji="🎉" title="Inbox zero!" text={t('Non ci sono richieste in attesa. Ottimo lavoro.')} /></Card>}
 
       <div className="space-y-4">
         <AnimatePresence>
@@ -85,11 +86,11 @@ export function Approvals() {
                     <div className="mt-2 flex items-center gap-3">
                       <TypeIcon type={r.type} size={36} />
                       <div>
-                        <div className="font-semibold">{typeText(r)} · {num(r.amount)} {r.type === 'PERMESSO' ? 'ore' : 'giorni'}</div>
+                        <div className="font-semibold">{typeText(r)} · {num(r.amount)} {r.type === 'PERMESSO' ? t(r.amount === 1 ? 'ora' : 'ore') : t(r.amount === 1 ? 'giorno' : 'giorni')}</div>
                         <div className="text-sm text-muted">{range(r)}</div>
                       </div>
                       {r.status === 'CANCEL_REQUESTED' && <StatusChip status={r.status} />}
-                      {needsCertificate(r) && !(r.attachments ?? []).length && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-300">Certificato mancante</span>}
+                      {needsCertificate(r) && !(r.attachments ?? []).length && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-300">{t('Certificato mancante')}</span>}
                     </div>
                     {r.note && <p className="mt-3 rounded-xl bg-[var(--grid)] px-3 py-2 text-sm">“{r.note}”</p>}
                     <Attachments requestId={r.id} items={r.attachments ?? []} />
@@ -97,11 +98,11 @@ export function Approvals() {
                   </div>
                   <div className="flex w-full gap-2 sm:w-auto sm:flex-col">
                     <Button variant="success" className="flex-1" disabled={decide.isPending} onClick={() => decide.mutate({ r, ok: true })}>
-                      <Check size={17} /> {r.status === 'CANCEL_REQUESTED' ? 'Conferma annullo' : 'Approva'}
+                      <Check size={17} /> {r.status === 'CANCEL_REQUESTED' ? t('Conferma annullo') : t('Approva')}
                     </Button>
                     <Button className="flex-1" disabled={decide.isPending}
                       onClick={() => r.status === 'CANCEL_REQUESTED' ? decide.mutate({ r, ok: false }) : setRejecting(r)}>
-                      <X size={17} /> {r.status === 'CANCEL_REQUESTED' ? 'Mantieni' : 'Rifiuta'}
+                      <X size={17} /> {r.status === 'CANCEL_REQUESTED' ? t('Mantieni') : t('Rifiuta')}
                     </Button>
                   </div>
                 </div>
@@ -111,14 +112,14 @@ export function Approvals() {
         </AnimatePresence>
       </div>
 
-      <Modal open={!!rejecting} onClose={() => setRejecting(null)} title={`Rifiuta la richiesta di ${rejecting?.user.fullName ?? ''}`}>
+      <Modal open={!!rejecting} onClose={() => setRejecting(null)} title={t('Rifiuta la richiesta di {who}', { who: rejecting?.user.fullName ?? '' })}>
         <div className="space-y-4">
-          <Field label="Motivo (obbligatorio)" hint="Lo vedrà la persona che ha fatto la richiesta.">
-            <textarea autoFocus className={`${inputCls} min-h-24`} maxLength={500} value={reason} onChange={e => setReason(e.target.value)} placeholder="Es. rilascio in produzione quella settimana" />
+          <Field label={t('Motivo (obbligatorio)')} hint={t('Lo vedrà la persona che ha fatto la richiesta.')}>
+            <textarea autoFocus className={`${inputCls} min-h-24`} maxLength={500} value={reason} onChange={e => setReason(e.target.value)} placeholder={t('Es. rilascio in produzione quella settimana')} />
           </Field>
           <div className="flex justify-end gap-2">
-            <Button onClick={() => setRejecting(null)}>Annulla</Button>
-            <Button variant="danger" disabled={!reason.trim() || decide.isPending} onClick={() => rejecting && decide.mutate({ r: rejecting, ok: false, note: reason })}>Rifiuta</Button>
+            <Button onClick={() => setRejecting(null)}>{t('Annulla')}</Button>
+            <Button variant="danger" disabled={!reason.trim() || decide.isPending} onClick={() => rejecting && decide.mutate({ r: rejecting, ok: false, note: reason })}>{t('Rifiuta')}</Button>
           </div>
         </div>
       </Modal>

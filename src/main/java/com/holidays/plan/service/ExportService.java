@@ -69,7 +69,7 @@ public class ExportService {
         checkCanExport(actor);
         LocalDate from = ym.atDay(1), to = ym.atEndOfMonth();
         List<AbsenceRequest> list = requests.findOverlapping(from, to, RequestStatus.ACTIVE).stream()
-            .filter(r -> inScope(actor, r.getUser()))
+            .filter(r -> r.getType() != AbsenceType.TENTATIVE && inScope(actor, r.getUser()))
             .sorted(Comparator.comparing((AbsenceRequest r) -> r.getUser().getFullName()).thenComparing(AbsenceRequest::getStartDate))
             .toList();
         Map<Long, Long> attCount = list.isEmpty() ? Map.of() : attachments
@@ -91,6 +91,7 @@ public class ExportService {
                 case PERMESSO -> s[1] = s[1].add(a);
                 case GENERAL_LEAVE -> s[2] = s[2].add(a);
                 case CLIENT_OFFICE, BUSINESS_TRIP -> s[3] = s[3].add(a);
+                default -> { }
             }
         }
 

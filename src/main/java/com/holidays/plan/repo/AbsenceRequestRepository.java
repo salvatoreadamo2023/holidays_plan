@@ -32,6 +32,15 @@ public interface AbsenceRequestRepository extends JpaRepository<AbsenceRequest, 
     boolean existsOverlapForUser(@Param("userId") Long userId, @Param("from") LocalDate from,
                                  @Param("to") LocalDate to, @Param("statuses") Collection<RequestStatus> statuses);
 
+    /** Come sopra ma ignora un tipo (le ferie ipotetiche TH non bloccano le richieste vere). */
+    @Query("""
+            select count(r) > 0 from AbsenceRequest r
+            where r.user.id = :userId and r.status in :statuses and r.type <> :skip
+              and r.startDate <= :to and r.endDate >= :from""")
+    boolean existsOverlapForUserExcept(@Param("userId") Long userId, @Param("from") LocalDate from,
+                                       @Param("to") LocalDate to, @Param("statuses") Collection<RequestStatus> statuses,
+                                       @Param("skip") com.holidays.plan.domain.AbsenceType skip);
+
     @Query("""
             select coalesce(sum(r.amount), 0) from AbsenceRequest r
             where r.user.id = :userId and r.type = :type and r.status in :statuses

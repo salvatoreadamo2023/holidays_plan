@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { num } from '../lib/format'
+import { t } from '../lib/i18n'
 
 /** Anello animato: consumato (pieno) + in attesa (tratteggiato) su totale. */
 export function RingGauge({ total, used, pending, unit, label, from, to, size = 168 }:
@@ -37,11 +38,11 @@ export function RingGauge({ total, used, pending, unit, label, from, to, size = 
           <motion.span className="font-display text-4xl font-bold tracking-tight" initial={{ opacity: 0, scale: .6 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: .3, type: 'spring' }}>
             {num(available)}
           </motion.span>
-          <span className="text-xs text-muted">{unit} disponibili</span>
+          <span className="text-xs text-muted">{unit} {t('disponibili')}</span>
         </div>
       </div>
       <p className="mt-3 font-semibold">{label}</p>
-      <p className="text-xs text-muted">{num(used)} usati · {num(pending)} in attesa · {num(total)} totali</p>
+      <p className="text-xs text-muted">{num(used)} {t('usati')} · {num(pending)} {t('in attesa')} · {num(total)} {t('totali')}</p>
     </div>
   )
 }

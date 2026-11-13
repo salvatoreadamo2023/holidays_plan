@@ -4,12 +4,13 @@ import { FileText, ImageIcon, Paperclip, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, tokenStore, ApiError } from '../lib/api'
 import type { AttachmentInfo } from '../lib/types'
+import { t, ts } from '../lib/i18n'
 
 export const ACCEPT = 'application/pdf,image/jpeg,image/png'
 export const MAX_MB = 5
 
 export async function uploadAttachment(requestId: number, file: File) {
-  if (file.size > MAX_MB * 1024 * 1024) throw new ApiError(400, `Il file supera i ${MAX_MB} MB`)
+  if (file.size > MAX_MB * 1024 * 1024) throw new ApiError(400, t('Il file supera i {n} MB', { n: MAX_MB }))
   const fd = new FormData()
   fd.append('file', file)
   const token = tokenStore.get()
@@ -17,8 +18,8 @@ export async function uploadAttachment(requestId: number, file: File) {
     method: 'POST', body: fd, headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   if (!res.ok) {
-    let msg = 'Caricamento non riuscito'
-    try { const p = await res.json(); if (p?.detail) msg = p.detail } catch { /* ignore */ }
+    let msg = t('Caricamento non riuscito')
+    try { const p = await res.json(); if (p?.detail) msg = ts(p.detail) } catch { /* ignore */ }
     throw new ApiError(res.status, msg)
   }
   return res.json() as Promise<AttachmentInfo>
@@ -32,12 +33,12 @@ export function Attachments({ requestId, items, editable }: { requestId: number;
   const input = useRef<HTMLInputElement>(null)
   const add = useMutation({
     mutationFn: (f: File) => uploadAttachment(requestId, f),
-    onSuccess: () => { toast.success('Allegato caricato'); qc.invalidateQueries() },
+    onSuccess: () => { toast.success(t('Allegato caricato')); qc.invalidateQueries() },
     onError: (e: Error) => toast.error(e.message),
   })
   const remove = useMutation({
     mutationFn: (id: number) => api(`/api/attachments/${id}`, { method: 'DELETE' }),
-    onSuccess: () => { toast.success('Allegato rimosso'); qc.invalidateQueries() },
+    onSuccess: () => { toast.success(t('Allegato rimosso')); qc.invalidateQueries() },
     onError: (e: Error) => toast.error(e.message),
   })
   const open = async (id: number) => {
@@ -56,13 +57,13 @@ export function Attachments({ requestId, items, editable }: { requestId: number;
           {a.contentType === 'application/pdf' ? <FileText size={13} /> : <ImageIcon size={13} />}
           <button className="max-w-[180px] truncate hover:underline" onClick={() => open(a.id)} title={a.filename}>{a.filename}</button>
           <span className="text-muted">{kb(a.sizeBytes)}</span>
-          {editable && <button aria-label="Rimuovi allegato" className="text-muted hover:text-rose-500" onClick={() => remove.mutate(a.id)}><Trash2 size={13} /></button>}
+          {editable && <button aria-label={t('Rimuovi allegato')} className="text-muted hover:text-rose-500" onClick={() => remove.mutate(a.id)}><Trash2 size={13} /></button>}
         </span>
       ))}
       {editable && items.length < 5 && (
         <>
           <button className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-violet-500 hover:bg-violet-500/10" disabled={add.isPending} onClick={() => input.current?.click()}>
-            <Paperclip size={13} /> {add.isPending ? 'Caricamento…' : 'Allega file'}
+            <Paperclip size={13} /> {add.isPending ? t('Caricamento…') : t('Allega file')}
           </button>
           <input ref={input} type="file" accept={ACCEPT} hidden onChange={e => { const f = e.target.files?.[0]; if (f) add.mutate(f); e.target.value = '' }} />
         </>

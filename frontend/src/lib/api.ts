@@ -1,3 +1,4 @@
+import { t, ts } from './i18n'
 const TOKEN_KEY = 'hp.token'
 
 export const tokenStore = {
@@ -24,8 +25,8 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     tokenStore.clear(); onUnauthorized?.()
   }
   if (!res.ok) {
-    let msg = 'Qualcosa è andato storto'
-    try { const p = await res.json(); if (p?.detail) msg = p.detail } catch { /* ignore */ }
+    let msg = t('Qualcosa è andato storto')
+    try { const p = await res.json(); if (p?.detail) msg = ts(p.detail) } catch { /* ignore */ }
     throw new ApiError(res.status, msg)
   }
   if (res.status === 204) return undefined as T
@@ -36,7 +37,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 export async function download(path: string, filename: string) {
   const token = tokenStore.get()
   const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-  if (!res.ok) throw new ApiError(res.status, 'Export non riuscito')
+  if (!res.ok) throw new ApiError(res.status, t('Export non riuscito'))
   const url = URL.createObjectURL(await res.blob())
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)

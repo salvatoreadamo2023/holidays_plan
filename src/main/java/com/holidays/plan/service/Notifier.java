@@ -40,6 +40,7 @@ public class Notifier {
             case GENERAL_LEAVE -> "General leave";
             case CLIENT_OFFICE -> "Presso cliente (CO)";
             case BUSINESS_TRIP -> "Trasferta (BT)";
+            case TENTATIVE -> "Ferie ipotetiche (TH)";
         };
     }
 

@@ -489,6 +489,36 @@ class SecurityAndFlowTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
     }
 
+    @Test
+    void ferieIpoteticheTH_visibili_senzaApprovazione_eTrasformabiliInRichiesta() throws Exception {
+        LocalDate d = freshMonday();
+        String body = mvc.perform(post("/api/requests").header("Authorization", token("sara")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "TENTATIVE", "startDate", d.toString(), "endDate", d.plusDays(1).toString()))))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("APPROVED")).andReturn().getResponse().getContentAsString();
+        long id = json.readTree(body).get("id").asLong();
+        String cal = mvc.perform(get("/api/calendar").param("from", d.toString()).param("to", d.plusDays(4).toString())
+                .header("Authorization", token("user"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(cal).contains("TENTATIVE");
+        // Due TH sugli stessi giorni no
+        mvc.perform(post("/api/requests").header("Authorization", token("sara")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "TENTATIVE", "startDate", d.toString(), "endDate", d.toString()))))
+            .andExpect(status().isConflict());
+        // Le TH non bloccano una richiesta vera: l'anteprima di ferie negli stessi giorni non da' avvisi
+        mvc.perform(post("/api/requests/preview").header("Authorization", token("sara")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", d.toString(), "endDate", d.toString()))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.warnings").isEmpty());
+        // Un altro non puo' trasformarla
+        mvc.perform(post("/api/requests/" + id + "/convert").header("Authorization", token("user"))).andExpect(status().isForbidden());
+        // Trasformata: nasce una richiesta di ferie in attesa con le stesse date, la TH sparisce
+        mvc.perform(post("/api/requests/" + id + "/convert").header("Authorization", token("sara")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("FERIE")).andExpect(jsonPath("$.status").value("PENDING"))
+            .andExpect(jsonPath("$.startDate").value(d.toString())).andExpect(jsonPath("$.endDate").value(d.plusDays(1).toString()));
+        String mine = mvc.perform(get("/api/requests/mine").header("Authorization", token("sara"))).andReturn().getResponse().getContentAsString();
+        for (JsonNode r : json.readTree(mine)) if (r.get("id").asLong() == id) assertThat(r.get("status").asText()).isEqualTo("CANCELLED");
+        // Non si trasforma due volte
+        mvc.perform(post("/api/requests/" + id + "/convert").header("Authorization", token("sara"))).andExpect(status().isConflict());
+    }
+
     private JsonNode stats(String admin, int year) throws Exception {
         return json.readTree(mvc.perform(get("/api/admin/stats").param("year", String.valueOf(year)).header("Authorization", admin))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());

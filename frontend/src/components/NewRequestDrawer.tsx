@@ -10,8 +10,9 @@ import type { AbsenceType, CreateRequest, LeaveReason, Preview, UserSummary } fr
 import { useUi } from '../lib/ui'
 import { Avatar, Button, Field, inputCls, Modal } from './ui'
 import { ACCEPT, MAX_MB, uploadAttachment } from './Attachments'
+import { t, ts } from '../lib/i18n'
 
-const types: AbsenceType[] = ['FERIE', 'PERMESSO', 'GENERAL_LEAVE', 'CLIENT_OFFICE', 'BUSINESS_TRIP']
+const types: AbsenceType[] = ['FERIE', 'PERMESSO', 'GENERAL_LEAVE', 'CLIENT_OFFICE', 'BUSINESS_TRIP', 'TENTATIVE']
 const reasons = Object.keys(reasonLabel) as LeaveReason[]
 
 function useDebounced<T>(v: T, ms = 350) {
@@ -60,16 +61,17 @@ export function NewRequestDrawer() {
       const r = await api<{ id: number }>('/api/requests', { method: 'POST', json: payload })
       if (file) {
         try { await uploadAttachment(r.id, file) }
-        catch (e) { toast.error(`Richiesta inviata, ma l'allegato non è stato caricato: ${(e as Error).message}`) }
+        catch (e) { toast.error(t("Richiesta inviata, ma l'allegato non è stato caricato: {err}", { err: (e as Error).message })) }
       }
       return r
     },
     onSuccess: () => {
       const who = people.data?.find(u => u.id === payload.forUserId)?.fullName
-      if (who) toast.success('Assenza inserita', { description: `Registrata per ${who}, già approvata.` })
-      else if (payload.type === 'GENERAL_LEAVE') toast.success('Assenza registrata', { description: 'I responsabili sono stati avvisati.' })
-      else if (isPresence(payload.type)) toast.success('Registrato', { description: 'Visibile a tutti nel calendario.' })
-      else toast.success('Richiesta inviata', { description: 'Il tuo responsabile riceverà la notifica.' })
+      if (who) toast.success(t('Assenza inserita'), { description: t('Registrata per {who}, già approvata.', { who }) })
+      else if (payload.type === 'GENERAL_LEAVE') toast.success(t('Assenza registrata'), { description: t('I responsabili sono stati avvisati.') })
+      else if (payload.type === 'TENTATIVE') toast.success(t('Ferie ipotetiche salvate'), { description: t('Quando sei sicuro, trasformale in richiesta da Le mie richieste.') })
+      else if (isPresence(payload.type)) toast.success(t('Registrato'), { description: t('Visibile a tutti nel calendario.') })
+      else toast.success(t('Richiesta inviata'), { description: t('Il tuo responsabile riceverà la notifica.') })
       qc.invalidateQueries(); closeRequest()
     },
     onError: (e: Error) => toast.error(e.message),
@@ -80,17 +82,17 @@ export function NewRequestDrawer() {
   const err = preview.error as Error | null
 
   return (
-    <Modal open={requestOpen} onClose={closeRequest} title="Nuova richiesta" side>
+    <Modal open={requestOpen} onClose={closeRequest} title={t('Nuova richiesta')} side>
       <div className="space-y-6">
         {!!people.data?.length && (
-          <Field label="Per chi" hint={forOther ? "L'assenza viene registrata già approvata e la persona riceve un avviso. Puoi inserire anche date passate." : undefined}>
+          <Field label={t('Per chi')} hint={forOther ? t("L'assenza viene registrata già approvata e la persona riceve un avviso. Puoi inserire anche date passate.") : undefined}>
             <select className={inputCls} value={form.forUserId ?? ''} onChange={e => set('forUserId', e.target.value ? Number(e.target.value) : null)}>
-              <option value="">Per me</option>
+              <option value="">{t('Per me')}</option>
               {people.data.map(u => <option key={u.id} value={u.id}>{u.fullName}{u.teamName ? ` · ${u.teamName}` : ''}</option>)}
             </select>
           </Field>
         )}
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Tipo di assenza">
+        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={t('Tipo di assenza')}>
           {types.map(t => (
             <button
               key={t} role="radio" aria-checked={form.type === t}
@@ -106,39 +108,42 @@ export function NewRequestDrawer() {
         </div>
 
         <div className={clsx('grid gap-3', single ? 'grid-cols-1' : 'grid-cols-2')}>
-          <Field label={single ? 'Giorno' : 'Dal'}>
+          <Field label={single ? t('Giorno') : t('Dal')}>
             <input type="date" className={inputCls} value={form.startDate}
               onChange={e => { set('startDate', e.target.value); if (e.target.value > form.endDate) set('endDate', e.target.value) }} />
           </Field>
           {!single && (
-            <Field label="Al">
+            <Field label={t('Al')}>
               <input type="date" className={inputCls} value={form.endDate} min={form.startDate} onChange={e => set('endDate', e.target.value)} />
             </Field>
           )}
         </div>
 
         {form.type === 'GENERAL_LEAVE' && (
-          <Field label="Tipologia" hint="La vedono solo i tuoi responsabili e l'admin: ai colleghi compare solo «Assente».">
+          <Field label={t('Tipologia')} hint={t("La vedono solo i tuoi responsabili e l'admin: ai colleghi compare solo «Assente».")}>
             <select className={inputCls} value={form.leaveReason ?? ''} onChange={e => set('leaveReason', (e.target.value || null) as LeaveReason | null)}>
-              <option value="">Scegli…</option>
+              <option value="">{t('Scegli…')}</option>
               {reasons.map(r => <option key={r} value={r}>{reasonLabel[r]}</option>)}
             </select>
           </Field>
         )}
-        {isPresence(form.type) && (
-          <p className="rounded-2xl bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">Non è un'assenza: viene registrato subito, senza approvazione, ed è visibile a tutti nel calendario.</p>
+        {form.type === 'TENTATIVE' && (
+          <p className="rounded-2xl bg-violet-500/10 p-3 text-sm text-violet-700 dark:text-violet-300">{t("Solo un'idea di pianificazione: non va approvata, non scala le ferie e non conta nelle statistiche. È visibile a tutti. Quando sei sicuro, trasformala in una richiesta di ferie da Le mie richieste.")}</p>
+        )}
+        {isPresence(form.type) && form.type !== 'TENTATIVE' && (
+          <p className="rounded-2xl bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">{t("Non è un'assenza: viene registrato subito, senza approvazione, ed è visibile a tutti nel calendario.")}</p>
         )}
 
         {form.type === 'PERMESSO' && (
-          <Field label={`Ore di permesso: ${num(form.hours)}`}>
+          <Field label={t('Ore di permesso: {n}', { n: num(form.hours) })}>
             <input type="range" min={0.5} max={8} step={0.5} value={form.hours ?? 1}
               onChange={e => set('hours', Number(e.target.value))} className="w-full accent-amber-500" />
           </Field>
         )}
 
-        <Field label="Note (facoltative)">
+        <Field label={t('Note (facoltative)')}>
           <textarea className={clsx(inputCls, 'min-h-20 resize-none')} maxLength={500} value={form.note}
-            placeholder={form.type === 'GENERAL_LEAVE' ? 'Es. numero protocollo certificato…' : isPresence(form.type) ? 'Es. cliente, città…' : 'Es. viaggio, visita medica…'}
+            placeholder={t(form.type === 'GENERAL_LEAVE' ? 'Es. numero protocollo certificato…' : isPresence(form.type) && form.type !== 'TENTATIVE' ? 'Es. cliente, città…' : 'Es. viaggio, visita medica…')}
             onChange={e => set('note', e.target.value)} />
         </Field>
 
@@ -152,35 +157,35 @@ export function NewRequestDrawer() {
             <motion.div key="ok" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="relative overflow-hidden rounded-2xl border border-soft p-4">
               <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-violet-500/20 blur-2xl" />
-              <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted"><Sparkles size={14} /> Anteprima</div>
+              <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted"><Sparkles size={14} /> {t('Anteprima')}</div>
               <div className="flex items-end gap-6">
                 <div>
                   <div className="font-display text-4xl font-bold">{num(p.amount)}</div>
-                  <div className="text-xs text-muted">{p.unit} {form.type === 'PERMESSO' ? '' : 'lavorativi'}</div>
+                  <div className="text-xs text-muted">{form.type === 'PERMESSO' ? t(p.amount === 1 ? 'ora' : p.unit) : p.amount === 1 ? t('giorno lavorativo') : t('{unit} lavorativi', { unit: t(p.unit) })}</div>
                 </div>
               </div>
               {p.warnings.map(w => (
-                <p key={w} className="mt-3 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-300"><AlertTriangle size={15} /> {w}</p>
+                <p key={w} className="mt-3 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-300"><AlertTriangle size={15} /> {ts(w)}</p>
               ))}
               <div className="mt-4 border-t border-soft pt-3">
                 <p className="mb-2 flex items-center gap-2 text-sm font-medium"><Users size={15} />
-                  {p.colleaguesAbsent.length ? `${p.colleaguesAbsent.length} colleghi dell'area assenti in quei giorni` : 'Nessun collega dell\'area assente: via libera!'}
+                  {p.colleaguesAbsent.length ? t("{n} colleghi dell'area assenti in quei giorni", { n: p.colleaguesAbsent.length }) : t("Nessun collega dell'area assente: via libera!")}
                 </p>
                 <div className="flex -space-x-2">{p.colleaguesAbsent.slice(0, 8).map(n => <Avatar key={n} name={n} size={30} ring />)}</div>
               </div>
             </motion.div>
           ) : (
-            <motion.div key="loading" className="flex items-center gap-2 text-sm text-muted"><CalendarDays size={16} /> Calcolo in corso…</motion.div>
+            <motion.div key="loading" className="flex items-center gap-2 text-sm text-muted"><CalendarDays size={16} /> {t('Calcolo in corso…')}</motion.div>
           )}
         </AnimatePresence>
 
-        <Field label="Allegato (facoltativo)" hint={`Certificato o giustificativo: PDF, JPG o PNG fino a ${MAX_MB} MB. Puoi aggiungerlo anche dopo da Le mie richieste.`}>
+        <Field label={t('Allegato (facoltativo)')} hint={t('Certificato o giustificativo: PDF, JPG o PNG fino a {n} MB. Puoi aggiungerlo anche dopo da Le mie richieste.', { n: MAX_MB })}>
           <input type="file" accept={ACCEPT} className={clsx(inputCls, 'py-2 text-sm')} onChange={e => setFile(e.target.files?.[0] ?? null)} />
         </Field>
 
         <Button variant="primary" className="w-full py-3.5 text-base" disabled={create.isPending || !!err || !p || p.warnings.length > 0 || (form.type === 'GENERAL_LEAVE' && !form.leaveReason)}
           onClick={() => create.mutate()}>
-          {create.isPending ? 'Invio…' : forOther ? 'Inserisci assenza' : isAutoRecorded(form.type) ? 'Registra' : 'Invia richiesta'}
+          {t(create.isPending ? 'Invio…' : forOther ? 'Inserisci assenza' : isAutoRecorded(form.type) ? 'Registra' : 'Invia richiesta')}
         </Button>
       </div>
     </Modal>
