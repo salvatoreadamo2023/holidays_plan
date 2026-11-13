@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { api, download } from '../lib/api'
 import { fmt, num } from '../lib/format'
 import { t } from '../lib/i18n'
-import { Button, Card, Field, inputCls, SectionTitle } from './ui'
+import { Button, Card, Field, inputCls, Pager, SectionTitle, usePaged } from './ui'
 
 interface BalanceRow { userId: number; username: string; fullName: string; team: string | null; referenceMonth: string | null; leaveDays: number | null; permitHours: number | null; uploadedAt: string | null }
 interface ImportRow { row: number; username: string; fullName: string | null; leaveDays: number | null; permitHours: number | null; error: string | null }
@@ -40,6 +40,9 @@ export function BalancesTab() {
     onError: (e: Error) => toast.error(e.message),
   })
   const getTemplate = () => download('/api/admin/balances/template', 'saldi-residui.xlsx').catch((e: Error) => toast.error(e.message))
+  const [q, setQ] = useState('')
+  const filtered = list.filter(b => `${b.fullName} ${b.team ?? ''}`.toLowerCase().includes(q.toLowerCase()))
+  const pg = usePaged(filtered, 10, q)
   const last = list.filter(b => b.uploadedAt).sort((a, b) => (b.uploadedAt! > a.uploadedAt! ? 1 : -1))[0]
 
   return (
@@ -101,13 +104,14 @@ export function BalancesTab() {
       <Card>
         <SectionTitle>{t('Saldi attuali')}</SectionTitle>
         {last && <p className="mb-3 text-sm text-muted">{t('Ultimo caricamento: {d}', { d: fmt(last.uploadedAt!, 'd MMM yyyy, HH:mm') })}</p>}
+        <input className={`${inputCls} mb-3`} placeholder={t('Cerca persona o team…')} value={q} onChange={e => setQ(e.target.value)} />
         <div className="overflow-auto scrollbar-thin">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-muted">
               <tr><th className="py-2 pr-3">{t('Persona')}</th><th className="pr-3">Team</th><th className="pr-3">{t('Saldo al mese')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th></tr>
             </thead>
             <tbody>
-              {list.map(b => (
+              {pg.rows.map(b => (
                 <tr key={b.userId} className="border-t border-soft">
                   <td className="py-2 pr-3">{b.fullName}</td>
                   <td className="pr-3 text-muted">{b.team ?? '—'}</td>
@@ -119,6 +123,7 @@ export function BalancesTab() {
             </tbody>
           </table>
         </div>
+        <Pager pg={pg} className="mt-3" />
       </Card>
     </div>
   )

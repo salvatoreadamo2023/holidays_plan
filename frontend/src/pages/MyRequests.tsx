@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { api } from '../lib/api'
 import { fmt, isPresence, needsCertificate, num, range, typeText } from '../lib/format'
 import type { RequestView, Status } from '../lib/types'
-import { Button, Card, Empty, StatusChip, TypeIcon } from '../components/ui'
+import { Button, Card, Empty, Pager, StatusChip, TypeIcon, usePaged } from '../components/ui'
 import { Attachments } from '../components/Attachments'
 import { AmendModal, AmendsLine } from '../components/AmendModal'
 import { t } from '../lib/i18n'
@@ -32,6 +32,7 @@ export function MyRequests() {
   const [amending, setAmending] = useState<RequestView | null>(null)
   const amendPending = new Set((q.data ?? []).filter(r => r.status === 'PENDING' && r.amends).map(r => r.amends!.id))
   const list = (q.data ?? []).filter(r => filters.find(x => x.key === f)!.match(r.status))
+  const pg = usePaged(list, 10, f)
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -50,7 +51,7 @@ export function MyRequests() {
       {q.data && list.length === 0 && <Card><Empty emoji="📭" title={t('Niente da mostrare')} text={t('Qui compariranno le tue richieste.')} /></Card>}
       <div className="relative space-y-3 before:absolute before:bottom-4 before:left-[27px] before:top-4 before:w-px before:bg-[var(--border)] md:before:left-[31px]">
         <AnimatePresence initial={false}>
-          {list.map((r, i) => (
+          {pg.rows.map((r, i) => (
             <motion.div key={r.id} layout initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }} transition={{ delay: i * .03 }}>
               <Card className="relative flex flex-wrap items-center gap-4 p-4">
                 <TypeIcon type={r.type} size={40} />
@@ -82,6 +83,7 @@ export function MyRequests() {
           ))}
         </AnimatePresence>
       </div>
+      <Pager pg={pg} />
       <AmendModal request={amending} onClose={() => setAmending(null)} />
     </div>
   )

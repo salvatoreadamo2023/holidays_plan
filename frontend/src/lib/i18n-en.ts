@@ -1,5 +1,11 @@
 /** Dizionario inglese: chiave = testo italiano mostrato nell'interfaccia. */
 export const EN: Record<string, string> = {
+  'Cerca persona o team…': 'Search person or team…',
+  '{from}–{to} di {n}': '{from}–{to} of {n}',
+  'Pagina precedente': 'Previous page',
+  'Pagina {p} di {n}': 'Page {p} of {n}',
+  'Pagina successiva': 'Next page',
+  'Cerca persona…': 'Search person…',
   // Tipologie, stati, ruoli
   'Ferie': 'Holidays', 'Permesso': 'Time off', 'General leave': 'General leave', 'Presso cliente (CO)': 'Client office (CO)',
   'Trasferta (BT)': 'Business trip (BT)', 'Ferie ipotetiche (TH)': 'Tentative holidays (TH)', 'Ipotesi (TH)': 'Tentative (TH)',

@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import clsx from 'clsx'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { avatarHue, initials, statusLabel, typeEmoji, typeLabel } from '../lib/format'
 import type { AbsenceType, Status } from '../lib/types'
 import { t } from '../lib/i18n'
@@ -135,6 +135,31 @@ export function Empty({ emoji, title, text }: { emoji: string; title: string; te
       <motion.div className="text-5xl" animate={{ y: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 3 }}>{emoji}</motion.div>
       <p className="font-display text-lg font-semibold">{title}</p>
       {text && <p className="max-w-sm text-sm text-muted">{text}</p>}
+    </div>
+  )
+}
+
+/** Paginazione lato client: 10 righe per pagina. Torna alla prima pagina quando cambia resetKey (es. la ricerca). */
+export function usePaged<T>(items: T[], size = 10, resetKey?: unknown) {
+  const [page, setPage] = useState(0)
+  useEffect(() => { setPage(0) }, [resetKey])
+  const pages = Math.max(1, Math.ceil(items.length / size))
+  const p = Math.min(page, pages - 1)
+  return { rows: items.slice(p * size, p * size + size), page: p, pages, setPage, total: items.length, size }
+}
+
+export function Pager({ pg, className }: { pg: ReturnType<typeof usePaged<unknown>>; className?: string }) {
+  if (pg.pages <= 1) return null
+  const from = pg.page * pg.size + 1, to = Math.min(pg.total, from + pg.size - 1)
+  const btn = 'rounded-lg border border-soft p-1.5 transition hover:bg-black/5 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-white/5'
+  return (
+    <div className={clsx('flex items-center justify-between gap-3 text-sm text-muted', className)}>
+      <span>{t('{from}–{to} di {n}', { from, to, n: pg.total })}</span>
+      <div className="flex items-center gap-2">
+        <button className={btn} disabled={pg.page === 0} onClick={() => pg.setPage(pg.page - 1)} aria-label={t('Pagina precedente')}><ChevronLeft size={16} /></button>
+        <span className="tabular-nums">{t('Pagina {p} di {n}', { p: pg.page + 1, n: pg.pages })}</span>
+        <button className={btn} disabled={pg.page >= pg.pages - 1} onClick={() => pg.setPage(pg.page + 1)} aria-label={t('Pagina successiva')}><ChevronRight size={16} /></button>
+      </div>
     </div>
   )
 }

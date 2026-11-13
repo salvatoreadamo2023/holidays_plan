@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { api } from '../lib/api'
 import { fmt, needsCertificate, num, range, roleLabel, typeText } from '../lib/format'
 import type { RequestView } from '../lib/types'
-import { Avatar, Button, Card, Empty, Field, inputCls, Modal, StatusChip, TypeIcon } from '../components/ui'
+import { Avatar, Button, Card, Empty, Field, inputCls, Modal, Pager, StatusChip, TypeIcon, usePaged } from '../components/ui'
 import { Attachments } from '../components/Attachments'
 import { AmendModal, AmendsLine } from '../components/AmendModal'
 import { t } from '../lib/i18n'
@@ -35,6 +35,10 @@ export function Approvals() {
   const [reason, setReason] = useState('')
   const list = q.data ?? []
   const team = useQuery({ queryKey: ['team-active'], queryFn: () => api<RequestView[]>('/api/requests/team-active') })
+  const pg = usePaged(list, 10)
+  const [teamQ, setTeamQ] = useState('')
+  const teamList = (team.data ?? []).filter(r => r.user.fullName.toLowerCase().includes(teamQ.toLowerCase()))
+  const tpg = usePaged(teamList, 10, teamQ)
   const [amending, setAmending] = useState<RequestView | null>(null)
   const [revoking, setRevoking] = useState<RequestView | null>(null)
   const [revokeNote, setRevokeNote] = useState('')
@@ -82,7 +86,7 @@ export function Approvals() {
 
       <div className="space-y-4">
         <AnimatePresence>
-          {list.map((r, i) => (
+          {pg.rows.map((r, i) => (
             <motion.div key={r.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, x: 120, rotate: 3, transition: { duration: .3 } }} transition={{ delay: i * .05 }}>
               <Card className={i === 0 ? 'ring-2 ring-violet-500/30' : ''}>
@@ -122,6 +126,7 @@ export function Approvals() {
           ))}
         </AnimatePresence>
       </div>
+      <Pager pg={pg} />
 
       {!!team.data?.length && (
         <section className="space-y-3 pt-4">
@@ -129,7 +134,8 @@ export function Approvals() {
             <h2 className="font-display text-xl font-bold">{t('Assenze approvate del team')}</h2>
             <p className="mt-1 text-sm text-muted">{t('In corso o future: puoi rettificarle o annullarle se la persona te lo chiede. Riceve una notifica.')}</p>
           </div>
-          {team.data.map(r => (
+          <input className={inputCls} placeholder={t('Cerca persona…')} value={teamQ} onChange={e => setTeamQ(e.target.value)} />
+          {tpg.rows.map(r => (
             <Card key={r.id} className="flex flex-wrap items-center gap-3 p-4">
               <TypeIcon type={r.type} size={36} />
               <div className="min-w-0 flex-1">
@@ -140,6 +146,7 @@ export function Approvals() {
               <Button onClick={() => setRevoking(r)}><Ban size={16} /> {t('Annulla')}</Button>
             </Card>
           ))}
+          <Pager pg={tpg} />
         </section>
       )}
 

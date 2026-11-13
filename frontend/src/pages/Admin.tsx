@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { api } from '../lib/api'
 import { fmt, roleLabel, typeLabel } from '../lib/format'
 import type { AbsenceType, AreaAdmin, HolidayAdmin, Role, TeamAdmin, UserAdmin } from '../lib/types'
-import { Avatar, Button, Card, Field, inputCls, Modal } from '../components/ui'
+import { Avatar, Button, Card, Field, inputCls, Modal, Pager, usePaged } from '../components/ui'
 import { t, t as tt } from '../lib/i18n'
 import { BalancesTab } from '../components/BalancesTab'
 
@@ -73,6 +73,7 @@ function UsersTab() {
   })
   const list = users.filter(u => `${u.fullName} ${u.username} ${u.email} ${u.areaName ?? ''}`.toLowerCase().includes(q.toLowerCase()))
   const set = <K extends keyof UserForm>(k: K, v: UserForm[K]) => setEdit(e => e && { ...e, [k]: v })
+  const pg = usePaged(list, 10, q)
 
   return (
     <Card className="p-0">
@@ -89,7 +90,7 @@ function UsersTab() {
             <tr><th className="px-4 py-3">{t('Persona')}</th><th>{t('Ruolo')}</th><th>Area / Team</th><th className="px-4" /></tr>
           </thead>
           <tbody>
-            {list.map(u => (
+            {pg.rows.map(u => (
               <tr key={u.id} className={clsx('border-t border-soft/60 hover:bg-black/[.02] dark:hover:bg-white/[.03]', !u.active && 'opacity-50')}>
                 <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar name={u.fullName} size={34} /><div><div className="font-semibold">{u.fullName}</div><div className="text-xs text-muted">{u.username} · {u.email}</div></div></div></td>
                 <td>{roleLabel[u.role]}{!u.active && <span className="ml-2 text-xs text-rose-500">{t('disattivato')}</span>}</td>
@@ -100,6 +101,7 @@ function UsersTab() {
           </tbody>
         </table>
       </div>
+      <Pager pg={pg} className="border-t border-soft px-4 py-3" />
 
       <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? t('Modifica {name}', { name: edit.fullName }) : t('Nuova persona')}>
         {edit && (
@@ -194,11 +196,12 @@ function TeamsTab() {
     onSuccess: () => { toast.success(t('Team salvato')); setEdit(null); invalidate() },
     onError: (e: Error) => toast.error(e.message),
   })
+  const pg = usePaged(teams, 10)
   return (
     <Card className="p-0">
       <div className="flex justify-end border-b border-soft p-4"><Button variant="primary" onClick={() => setEdit({ name: '', areaId: areas[0]?.id ?? null, leaderId: null })}><Plus size={16} /> {t('Nuovo team')}</Button></div>
       <ul>
-        {teams.map(t => (
+        {pg.rows.map(t => (
           <li key={t.id} className="flex items-center gap-4 border-t border-soft/60 px-4 py-3 first:border-t-0">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/10 text-violet-500"><UsersRound size={18} /></div>
             <div className="flex-1"><div className="font-semibold">{t.name}</div><div className="text-xs text-muted">{t.areaName} · Team Manager / Tech Lead: {t.leaderName ?? '—'}</div></div>
@@ -207,6 +210,7 @@ function TeamsTab() {
           </li>
         ))}
       </ul>
+      <Pager pg={pg} className="border-t border-soft px-4 py-3" />
       <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? t('Modifica team') : t('Nuovo team')}>
         {edit && (
           <form className="space-y-4" onSubmit={e => { e.preventDefault(); save.mutate(edit) }}>
