@@ -14,7 +14,11 @@ export interface RequestView {
   startDate: string; endDate: string; halfDay: boolean; hours: number | null; amount: number
   note: string | null; decisionNote: string | null; decidedBy: string | null; decidedAt: string | null; createdAt: string
   attachments: AttachmentInfo[]
+  /** Se e' una rettifica: la richiesta che sostituisce. */
+  amends?: AmendsInfo | null
 }
+
+export interface AmendsInfo { id: number; type: AbsenceType; leaveReason: LeaveReason | null; startDate: string; endDate: string; hours: number | null; amount: number; status: Status }
 
 export interface AttachmentInfo { id: number; requestId: number; filename: string; contentType: string; sizeBytes: number; createdAt: string }
 

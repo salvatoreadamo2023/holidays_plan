@@ -55,6 +55,13 @@ public class RequestController {
         return views.many(service.toDecide(currentUser.get()));
     }
 
+    /** Assenze approvate (in corso o future) delle persone di competenza, per rettificarle o annullarle. */
+    @GetMapping("/team-active")
+    @Transactional(readOnly = true)
+    public List<RequestView> teamActive() {
+        return views.many(service.teamActive(currentUser.get()));
+    }
+
     @PostMapping("/{id}/approve")
     @Transactional
     public RequestView approve(@PathVariable Long id, @Valid @RequestBody(required = false) Decision d) {
@@ -83,6 +90,20 @@ public class RequestController {
     @Transactional
     public RequestView convert(@PathVariable Long id) {
         return views.one(service.convertTentative(currentUser.get(), id));
+    }
+
+    /** Rettifica: l'interessato la chiede (da approvare), un responsabile con competenza la applica subito. */
+    @PostMapping("/{id}/amend")
+    @Transactional
+    public RequestView amend(@PathVariable Long id, @Valid @RequestBody CreateRequest in) {
+        return views.one(service.amend(currentUser.get(), id, in));
+    }
+
+    /** Un responsabile con competenza annulla subito un'assenza approvata, con motivo. */
+    @PostMapping("/{id}/revoke")
+    @Transactional
+    public RequestView revoke(@PathVariable Long id, @Valid @RequestBody Decision d) {
+        return views.one(service.revoke(currentUser.get(), id, d.note()));
     }
 
     @PostMapping("/{id}/cancel/accept")

@@ -66,7 +66,9 @@ public class Notifier {
     }
 
     public void decided(AbsenceRequest r, boolean approved) {
-        push.notify(List.of(r.getUser().getId()), approved ? "Richiesta approvata ✅" : "Richiesta rifiutata",
+        boolean amend = r.getAmends() != null;
+        push.notify(List.of(r.getUser().getId()),
+            amend ? (approved ? "Rettifica approvata ✅" : "Rettifica rifiutata") : (approved ? "Richiesta approvata ✅" : "Richiesta rifiutata"),
             what(r) + (r.getDecisionNote() != null ? " · " + r.getDecisionNote() : ""), data(r, "Richieste"));
     }
 
@@ -81,6 +83,19 @@ public class Notifier {
 
     public void leaveRecorded(AbsenceRequest r) {
         push.notify(approversOf(r.getUser()), r.getUser().getFullName() + " assente", what(r), data(r, "Calendario"));
+    }
+
+    public void amendRequested(AbsenceRequest r) {
+        push.notify(approversOf(r.getUser()), "Rettifica chiesta da " + r.getUser().getFullName(), what(r), data(r, "Approvazioni"));
+    }
+
+    public void amendedForYou(AbsenceRequest r, User by) {
+        push.notify(List.of(r.getUser().getId()), "La tua assenza e' stata rettificata", what(r) + " · da " + by.getFullName(), data(r, "Richieste"));
+    }
+
+    public void revoked(AbsenceRequest r, User by) {
+        push.notify(List.of(r.getUser().getId()), "La tua assenza e' stata annullata",
+            what(r) + " · da " + by.getFullName() + (r.getDecisionNote() != null ? " · " + r.getDecisionNote() : ""), data(r, "Richieste"));
     }
 
     public void insertedForYou(AbsenceRequest r, User by) {

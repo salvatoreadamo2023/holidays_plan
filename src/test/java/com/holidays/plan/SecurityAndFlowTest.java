@@ -624,4 +624,71 @@ class SecurityAndFlowTest {
         mvc.perform(multipart("/api/admin/balances/import").file(file).param("month", "2999-01").header("Authorization", admin))
             .andExpect(status().isBadRequest());
     }
+
+    private static String period(LocalDate from, LocalDate to) {
+        return "{\"type\":\"FERIE\",\"startDate\":\"" + from + "\",\"endDate\":\"" + to + "\"}";
+    }
+
+    private String statusOf(String tok, long id) throws Exception {
+        for (JsonNode n : json.readTree(mvc.perform(get("/api/requests/mine").header("Authorization", tok))
+                .andReturn().getResponse().getContentAsString()))
+            if (n.get("id").asLong() == id) return n.get("status").asText();
+        return null;
+    }
+
+    @Test
+    void rettifica_chiestaDallUtente_eDirettaDelResponsabile() throws Exception {
+        LocalDate d = freshMonday();
+        String u = token("user"), tl = token("techlead");
+        long orig = createFerie(u, d, d.plusDays(1));
+        mvc.perform(post("/api/requests/" + orig + "/approve").header("Authorization", tl)).andExpect(status().isOk());
+
+        // L'utente chiede la rettifica: nuova richiesta in attesa, l'originale resta approvata
+        MvcResult r = mvc.perform(post("/api/requests/" + orig + "/amend").header("Authorization", u)
+                .contentType(MediaType.APPLICATION_JSON).content(period(d.plusDays(2), d.plusDays(3))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PENDING"))
+            .andExpect(jsonPath("$.amends.id").value(orig)).andReturn();
+        long am1 = json.readTree(r.getResponse().getContentAsString()).get("id").asLong();
+        assertThat(statusOf(u, orig)).isEqualTo("APPROVED");
+        // Una sola rettifica in attesa alla volta; uguale all'originale no
+        mvc.perform(post("/api/requests/" + orig + "/amend").header("Authorization", u)
+            .contentType(MediaType.APPLICATION_JSON).content(period(d.plusDays(4), d.plusDays(4)))).andExpect(status().isConflict());
+        // Solo chi ha competenza decide
+        mvc.perform(post("/api/requests/" + am1 + "/approve").header("Authorization", token("pm2"))).andExpect(status().isForbidden());
+        // Rifiutata: resta tutto com'era
+        mvc.perform(post("/api/requests/" + am1 + "/reject").header("Authorization", tl)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Settimana di rilascio\"}")).andExpect(status().isOk());
+        assertThat(statusOf(u, orig)).isEqualTo("APPROVED");
+        mvc.perform(post("/api/requests/" + orig + "/amend").header("Authorization", u)
+            .contentType(MediaType.APPLICATION_JSON).content(period(d, d.plusDays(1)))).andExpect(status().isBadRequest());
+
+        // Nuova rettifica approvata: sostituisce l'originale
+        r = mvc.perform(post("/api/requests/" + orig + "/amend").header("Authorization", u)
+                .contentType(MediaType.APPLICATION_JSON).content(period(d.plusDays(1), d.plusDays(3))))
+            .andExpect(status().isOk()).andReturn();
+        long am2 = json.readTree(r.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(post("/api/requests/" + am2 + "/approve").header("Authorization", tl))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
+        assertThat(statusOf(u, orig)).isEqualTo("CANCELLED");
+
+        // Altri utenti non possono rettificare
+        mvc.perform(post("/api/requests/" + am2 + "/amend").header("Authorization", token("sara"))
+            .contentType(MediaType.APPLICATION_JSON).content(period(d.plusDays(4), d.plusDays(4)))).andExpect(status().isForbidden());
+        // Il responsabile rettifica subito
+        r = mvc.perform(post("/api/requests/" + am2 + "/amend").header("Authorization", tl)
+                .contentType(MediaType.APPLICATION_JSON).content(period(d.plusDays(4), d.plusDays(4))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"))
+            .andExpect(jsonPath("$.decidedBy").exists()).andReturn();
+        long am3 = json.readTree(r.getResponse().getContentAsString()).get("id").asLong();
+        assertThat(statusOf(u, am2)).isEqualTo("CANCELLED");
+
+        // Annullamento diretto: solo responsabile, con motivo
+        mvc.perform(post("/api/requests/" + am3 + "/revoke").header("Authorization", u)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"x\"}")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/requests/" + am3 + "/revoke").header("Authorization", tl)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"\"}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/requests/" + am3 + "/revoke").header("Authorization", token("admin"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Chiesto dall'interessato\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
 }

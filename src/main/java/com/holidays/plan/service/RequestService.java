@@ -14,8 +14,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class RequestService {
@@ -59,12 +61,20 @@ public class RequestService {
     }
 
     private Computed validateAndCompute(User user, CreateRequest in, boolean onBehalf) {
+        return validateAndCompute(user, in, onBehalf, null);
+    }
+
+    /** {@code minStart}: per le rettifiche, la data piu' vecchia ammessa (l'inizio della richiesta in corso). */
+    private Computed validateAndCompute(User user, CreateRequest in, boolean onBehalf, LocalDate minStart) {
         LocalDate today = LocalDate.now(clock);
         if (in.halfDay()) throw ApiException.bad("La mezza giornata non e' piu' prevista: usa il permesso a ore");
         if (in.endDate().isBefore(in.startDate())) throw ApiException.bad("La data di fine e' prima della data di inizio");
         if (in.startDate().plusDays(MAX_DAYS_SPAN).isBefore(in.endDate()))
             throw ApiException.bad("Una singola richiesta puo' coprire al massimo " + MAX_DAYS_SPAN + " giorni");
-        if (onBehalf) {
+        if (minStart != null) {
+            if (in.startDate().isBefore(minStart))
+                throw ApiException.bad("La rettifica non puo' iniziare prima di " + (minStart.equals(today) ? "oggi" : "l'inizio della richiesta attuale"));
+        } else if (onBehalf) {
             if (in.startDate().isBefore(today.minusDays(ON_BEHALF_BACKDATE_DAYS)))
                 throw ApiException.bad("Si puo' inserire un'assenza al massimo un anno indietro");
         } else if (in.type().isAutoRecorded() && in.type() != AbsenceType.TENTATIVE) {
@@ -218,10 +228,7 @@ public class RequestService {
         AbsenceRequest r = load(id);
         if (!policy.canDecide(actor, r.getUser())) throw ApiException.forbidden();
         if (r.getStatus() != RequestStatus.PENDING) throw ApiException.conflict("La richiesta non e' piu' in attesa");
-        r.setStatus(RequestStatus.APPROVED);
-        r.setDecidedBy(actor);
-        r.setDecidedAt(Instant.now(clock));
-        r.setDecisionNote(blankToNull(note));
+        applyAmendment(r, actor, blankToNull(note));
         audit.log(actor.getId(), r.getId(), "APPROVED", note);
         notifier.decided(r, true);
         return r;
@@ -307,9 +314,161 @@ public class RequestService {
         return r;
     }
 
+    // ---------------------------------------------------------------- Rettifiche
+
+    /**
+     * Rettifica di un'assenza approvata, di oggi o futura (o in corso).
+     * Chi ha l'assenza la chiede: e' una nuova richiesta che, se approvata, sostituisce l'originale (se rifiutata resta tutto com'e').
+     * Un responsabile con competenza (Admin compreso) la rettifica subito, e la persona riceve una notifica.
+     */
+    @Transactional
+    public AbsenceRequest amend(User actor, Long id, CreateRequest in) {
+        AbsenceRequest orig = load(id);
+        User owner = orig.getUser();
+        boolean self = Objects.equals(owner.getId(), actor.getId());
+        if (!self && !policy.canDecide(actor, owner)) throw ApiException.forbidden();
+        if (!RequestStatus.ACTIVE.contains(orig.getStatus()))
+            throw ApiException.conflict("Si possono rettificare solo richieste approvate");
+        LocalDate today = LocalDate.now(clock);
+        if (orig.getEndDate().isBefore(today)) throw ApiException.conflict("Il periodo e' gia' trascorso: non si puo' rettificare");
+        if (orig.getType() == AbsenceType.TENTATIVE)
+            throw ApiException.conflict("Le ferie ipotetiche (TH) si tolgono o si trasformano, non si rettificano");
+        if (in.type() == AbsenceType.TENTATIVE) throw ApiException.bad("Una rettifica non puo' diventare ferie ipotetiche (TH)");
+        List<AbsenceRequest> pendingAmendments = pendingAmendmentsOf(orig);
+        if (self && !pendingAmendments.isEmpty())
+            throw ApiException.conflict("C'e' gia' una rettifica in attesa per questa richiesta");
+
+        LocalDate minStart = orig.getStartDate().isBefore(today) ? orig.getStartDate() : today;
+        Computed c = validateAndCompute(owner, in, false, minStart);
+        requireReason(in);
+        if (sameAs(orig, in)) throw ApiException.bad("La rettifica e' uguale alla richiesta attuale");
+        Set<Long> skip = new HashSet<>();
+        skip.add(orig.getId());
+        pendingAmendments.forEach(a -> skip.add(a.getId()));
+        if (overlapsExcept(owner, in, skip))
+            throw ApiException.conflict(self ? "Hai gia' un'altra richiesta che si sovrappone a queste date"
+                : owner.getFullName() + " ha gia' un'altra assenza che si sovrappone a queste date");
+        if (self) {
+            long pending = requests.findByUser(owner.getId()).stream().filter(r -> r.getStatus() == RequestStatus.PENDING).count();
+            if (pending >= MAX_PENDING) throw ApiException.conflict("Hai gia' " + MAX_PENDING + " richieste in attesa");
+        }
+
+        AbsenceRequest r = new AbsenceRequest();
+        r.setUser(owner);
+        r.setType(in.type());
+        r.setStatus(RequestStatus.PENDING);
+        r.setStartDate(in.startDate());
+        r.setEndDate(in.endDate());
+        r.setHalfDay(false);
+        r.setHours(in.type() == AbsenceType.PERMESSO ? in.hours() : null);
+        r.setLeaveReason(in.type() == AbsenceType.GENERAL_LEAVE ? in.leaveReason() : null);
+        r.setAmount(c.amount());
+        r.setNote(blankToNull(in.note()));
+        r.setAmends(orig);
+        r = requests.save(r);
+        String what = "Rettifica di #" + orig.getId() + ": " + in.type() + " " + in.startDate() + " -> " + in.endDate();
+
+        if (!self) {
+            audit.log(actor.getId(), r.getId(), "AMENDED_BY_MANAGER", owner.getFullName() + " · " + what);
+            applyAmendment(r, actor, "Rettificata da " + actor.getFullName());
+            for (AbsenceRequest a : pendingAmendments) {
+                a.setStatus(RequestStatus.REJECTED);
+                a.setDecidedBy(actor);
+                a.setDecidedAt(Instant.now(clock));
+                a.setDecisionNote("Superata dalla rettifica di " + actor.getFullName());
+                audit.log(actor.getId(), a.getId(), "REJECTED", a.getDecisionNote());
+            }
+            notifier.amendedForYou(r, actor);
+            return r;
+        }
+        audit.log(owner.getId(), r.getId(), "AMEND_REQUESTED", what);
+        if (orig.getType().isPresence() && in.type().isAutoRecorded()) {
+            // CO, BT si tolgono e si mettono in autonomia: la rettifica vale subito.
+            applyAmendment(r, null, RECORDED_NOTE);
+            audit.log(null, r.getId(), "RECORDED", Notifier.label(r));
+            if (in.type() == AbsenceType.GENERAL_LEAVE) notifier.leaveRecorded(r);
+        } else if (notifier.approversOf(owner).isEmpty()) {
+            applyAmendment(r, null, AUTO_NOTE);
+            audit.log(null, r.getId(), "AUTO_APPROVED", AUTO_NOTE);
+        } else {
+            notifier.amendRequested(r);
+        }
+        return r;
+    }
+
+    /** Approva la richiesta; se e' una rettifica, l'originale ancora attiva viene sostituita (annullata). */
+    private void applyAmendment(AbsenceRequest r, User by, String note) {
+        Instant now = Instant.now(clock);
+        r.setStatus(RequestStatus.APPROVED);
+        r.setDecidedBy(by);
+        r.setDecidedAt(now);
+        r.setDecisionNote(note);
+        AbsenceRequest o = r.getAmends();
+        if (o != null && RequestStatus.ACTIVE.contains(o.getStatus())) {
+            o.setStatus(RequestStatus.CANCELLED);
+            o.setDecidedAt(now);
+            o.setDecisionNote("Sostituita dalla rettifica");
+            audit.log(by == null ? null : by.getId(), o.getId(), "AMENDED", "Sostituita da #" + r.getId());
+        }
+    }
+
+    private List<AbsenceRequest> pendingAmendmentsOf(AbsenceRequest orig) {
+        return requests.findByUser(orig.getUser().getId()).stream()
+            .filter(r -> r.getStatus() == RequestStatus.PENDING && r.getAmends() != null
+                && Objects.equals(r.getAmends().getId(), orig.getId()))
+            .toList();
+    }
+
+    private static boolean sameAs(AbsenceRequest o, CreateRequest in) {
+        return o.getType() == in.type() && o.getStartDate().equals(in.startDate()) && o.getEndDate().equals(in.endDate())
+            && (in.type() != AbsenceType.PERMESSO || (o.getHours() != null && in.hours() != null && o.getHours().compareTo(in.hours()) == 0))
+            && (in.type() != AbsenceType.GENERAL_LEAVE || o.getLeaveReason() == in.leaveReason());
+    }
+
+    private boolean overlapsExcept(User user, CreateRequest in, Set<Long> skip) {
+        return requests.findByUser(user.getId()).stream()
+            .filter(r -> !skip.contains(r.getId()) && RequestStatus.BLOCKING.contains(r.getStatus()) && r.getType() != AbsenceType.TENTATIVE)
+            .anyMatch(r -> !r.getStartDate().isAfter(in.endDate()) && !r.getEndDate().isBefore(in.startDate()));
+    }
+
+    /** Un responsabile con competenza (Admin compreso) annulla subito un'assenza approvata di oggi o futura, con un motivo. */
+    @Transactional
+    public AbsenceRequest revoke(User actor, Long id, String note) {
+        AbsenceRequest r = load(id);
+        if (!policy.canDecide(actor, r.getUser())) throw ApiException.forbidden();
+        if (!RequestStatus.ACTIVE.contains(r.getStatus())) throw ApiException.conflict("Si possono annullare solo richieste approvate");
+        if (r.getEndDate().isBefore(LocalDate.now(clock))) throw ApiException.conflict("Il periodo e' gia' trascorso");
+        if (blankToNull(note) == null) throw ApiException.bad("Indica il motivo dell'annullamento");
+        r.setStatus(RequestStatus.CANCELLED);
+        r.setDecidedBy(actor);
+        r.setDecidedAt(Instant.now(clock));
+        r.setDecisionNote(note.trim());
+        audit.log(actor.getId(), r.getId(), "REVOKED", note.trim());
+        for (AbsenceRequest a : pendingAmendmentsOf(r)) {
+            a.setStatus(RequestStatus.REJECTED);
+            a.setDecidedBy(actor);
+            a.setDecidedAt(Instant.now(clock));
+            a.setDecisionNote("La richiesta originale e' stata annullata");
+            audit.log(actor.getId(), a.getId(), "REJECTED", a.getDecisionNote());
+        }
+        notifier.revoked(r, actor);
+        return r;
+    }
+
     @Transactional(readOnly = true)
     public List<AbsenceRequest> mine(User user) {
         return requests.findByUser(user.getId());
+    }
+
+    /** Assenze approvate, in corso o future, delle persone di competenza: il responsabile le puo' rettificare o annullare. */
+    @Transactional(readOnly = true)
+    public List<AbsenceRequest> teamActive(User actor) {
+        if (!actor.getRole().isManager()) return List.of();
+        LocalDate today = LocalDate.now(clock);
+        return requests.findOverlapping(today, today.plusYears(2), java.util.EnumSet.of(RequestStatus.APPROVED)).stream()
+            .filter(r -> r.getType() != AbsenceType.TENTATIVE && policy.canDecide(actor, r.getUser()))
+            .sorted(java.util.Comparator.comparing(AbsenceRequest::getStartDate))
+            .toList();
     }
 
     /** Richieste che questo utente puo' decidere adesso. */

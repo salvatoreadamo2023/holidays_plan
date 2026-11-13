@@ -69,6 +69,11 @@ public class AbsenceRequest {
     @Column(name = "certificate_reminder_at")
     private Instant certificateReminderAt;
 
+    /** Se valorizzata, questa richiesta e' una rettifica: approvata, sostituisce quella indicata. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "amends_id")
+    private AbsenceRequest amends;
+
     @Version
     private long version;
 }

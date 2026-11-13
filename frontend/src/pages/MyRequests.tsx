@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Send, Undo2, XCircle } from 'lucide-react'
+import { PencilLine, Send, Undo2, XCircle } from 'lucide-react'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
@@ -9,6 +9,7 @@ import { fmt, isPresence, needsCertificate, num, range, typeText } from '../lib/
 import type { RequestView, Status } from '../lib/types'
 import { Button, Card, Empty, StatusChip, TypeIcon } from '../components/ui'
 import { Attachments } from '../components/Attachments'
+import { AmendModal, AmendsLine } from '../components/AmendModal'
 import { t } from '../lib/i18n'
 
 const filters: { key: string; label: string; match: (s: Status) => boolean }[] = [
@@ -28,6 +29,8 @@ export function MyRequests() {
     onError: (e: Error) => toast.error(e.message),
   })
   const today = new Date().toISOString().slice(0, 10)
+  const [amending, setAmending] = useState<RequestView | null>(null)
+  const amendPending = new Set((q.data ?? []).filter(r => r.status === 'PENDING' && r.amends).map(r => r.amends!.id))
   const list = (q.data ?? []).filter(r => filters.find(x => x.key === f)!.match(r.status))
 
   return (
@@ -56,9 +59,11 @@ export function MyRequests() {
                     <span className="font-semibold">{typeText(r)}</span>
                     <span className="text-sm text-muted">· {num(r.amount)} {r.type === 'PERMESSO' ? t(r.amount === 1 ? 'ora' : 'ore') : t(r.amount === 1 ? 'giorno' : 'giorni')}</span>
                     <StatusChip status={r.status} />
+                    {amendPending.has(r.id) && <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-700 dark:text-violet-300">{t('Rettifica in attesa')}</span>}
                     {needsCertificate(r) && !(r.attachments ?? []).length && ['PENDING', 'APPROVED'].includes(r.status) && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-300">{t('Certificato mancante')}</span>}
                   </div>
                   <div className="mt-0.5 text-sm">{range(r)}</div>
+                  <AmendsLine r={r} />
                   {r.note && <div className="mt-1 text-xs text-muted">“{r.note}”</div>}
                   {r.decidedBy && (
                     <div className="mt-1 text-xs text-muted">
@@ -70,12 +75,14 @@ export function MyRequests() {
                 </div>
                 {r.status === 'PENDING' && <Button onClick={() => act.mutate({ id: r.id, action: 'withdraw' })}><Undo2 size={16} /> {t('Ritira')}</Button>}
                 {r.type === 'TENTATIVE' && r.status === 'APPROVED' && r.startDate >= today && <Button variant="primary" disabled={act.isPending} onClick={() => act.mutate({ id: r.id, action: 'convert' })}><Send size={16} /> {t('Trasforma in richiesta')}</Button>}
+                {r.status === 'APPROVED' && r.endDate >= today && r.type !== 'TENTATIVE' && !amendPending.has(r.id) && <Button onClick={() => setAmending(r)}><PencilLine size={16} /> {t('Rettifica')}</Button>}
                 {r.status === 'APPROVED' && r.endDate >= today && <Button onClick={() => act.mutate({ id: r.id, action: 'cancel' })}><XCircle size={16} /> {isPresence(r.type) ? t('Togli') : t('Annulla')}</Button>}
               </Card>
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
+      <AmendModal request={amending} onClose={() => setAmending(null)} />
     </div>
   )
 }

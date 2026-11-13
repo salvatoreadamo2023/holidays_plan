@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Keyboard, X } from 'lucide-react'
+import { Ban, Check, Keyboard, PencilLine, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
-import { needsCertificate, num, range, roleLabel, typeText } from '../lib/format'
+import { fmt, needsCertificate, num, range, roleLabel, typeText } from '../lib/format'
 import type { RequestView } from '../lib/types'
 import { Avatar, Button, Card, Empty, Field, inputCls, Modal, StatusChip, TypeIcon } from '../components/ui'
 import { Attachments } from '../components/Attachments'
+import { AmendModal, AmendsLine } from '../components/AmendModal'
 import { t } from '../lib/i18n'
 
 function Conflicts({ r }: { r: RequestView }) {
@@ -33,6 +34,15 @@ export function Approvals() {
   const [rejecting, setRejecting] = useState<RequestView | null>(null)
   const [reason, setReason] = useState('')
   const list = q.data ?? []
+  const team = useQuery({ queryKey: ['team-active'], queryFn: () => api<RequestView[]>('/api/requests/team-active') })
+  const [amending, setAmending] = useState<RequestView | null>(null)
+  const [revoking, setRevoking] = useState<RequestView | null>(null)
+  const [revokeNote, setRevokeNote] = useState('')
+  const revoke = useMutation({
+    mutationFn: () => api(`/api/requests/${revoking!.id}/revoke`, { method: 'POST', json: { note: revokeNote } }),
+    onSuccess: () => { toast.success(t('Assenza annullata'), { description: t('{who} riceve una notifica.', { who: revoking!.user.fullName }) }); setRevoking(null); setRevokeNote(''); qc.invalidateQueries() },
+    onError: (e: Error) => toast.error(e.message),
+  })
 
   const decide = useMutation({
     mutationFn: ({ r, ok, note }: { r: RequestView; ok: boolean; note?: string }) => {
@@ -88,6 +98,7 @@ export function Approvals() {
                       <div>
                         <div className="font-semibold">{typeText(r)} · {num(r.amount)} {r.type === 'PERMESSO' ? t(r.amount === 1 ? 'ora' : 'ore') : t(r.amount === 1 ? 'giorno' : 'giorni')}</div>
                         <div className="text-sm text-muted">{range(r)}</div>
+                        <AmendsLine r={r} />
                       </div>
                       {r.status === 'CANCEL_REQUESTED' && <StatusChip status={r.status} />}
                       {needsCertificate(r) && !(r.attachments ?? []).length && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-300">{t('Certificato mancante')}</span>}
@@ -111,6 +122,40 @@ export function Approvals() {
           ))}
         </AnimatePresence>
       </div>
+
+      {!!team.data?.length && (
+        <section className="space-y-3 pt-4">
+          <div>
+            <h2 className="font-display text-xl font-bold">{t('Assenze approvate del team')}</h2>
+            <p className="mt-1 text-sm text-muted">{t('In corso o future: puoi rettificarle o annullarle se la persona te lo chiede. Riceve una notifica.')}</p>
+          </div>
+          {team.data.map(r => (
+            <Card key={r.id} className="flex flex-wrap items-center gap-3 p-4">
+              <TypeIcon type={r.type} size={36} />
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold">{r.user.fullName} <span className="font-normal text-muted">· {typeText(r)} · {num(r.amount)} {r.type === 'PERMESSO' ? t(r.amount === 1 ? 'ora' : 'ore') : t(r.amount === 1 ? 'giorno' : 'giorni')}</span></div>
+                <div className="text-sm text-muted">{range(r)}{r.decidedAt ? ` · ${t('approvata il {date}', { date: fmt(r.decidedAt, 'd MMM') })}` : ''}</div>
+              </div>
+              <Button onClick={() => setAmending(r)}><PencilLine size={16} /> {t('Rettifica')}</Button>
+              <Button onClick={() => setRevoking(r)}><Ban size={16} /> {t('Annulla')}</Button>
+            </Card>
+          ))}
+        </section>
+      )}
+
+      <AmendModal request={amending} onClose={() => setAmending(null)} manager />
+      <Modal open={!!revoking} onClose={() => setRevoking(null)} title={t("Annulla l'assenza di {who}", { who: revoking?.user.fullName ?? '' })}>
+        <div className="space-y-4">
+          {revoking && <p className="text-sm">{typeText(revoking)} · {range(revoking)}</p>}
+          <Field label={t('Motivo (obbligatorio)')} hint={t('Lo vedrà la persona interessata.')}>
+            <textarea autoFocus className={`${inputCls} min-h-24`} maxLength={500} value={revokeNote} onChange={e => setRevokeNote(e.target.value)} placeholder={t("Es. chiesto dall'interessato")} />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setRevoking(null)}>{t('Chiudi')}</Button>
+            <Button variant="danger" disabled={!revokeNote.trim() || revoke.isPending} onClick={() => revoke.mutate()}>{t('Annulla assenza')}</Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={!!rejecting} onClose={() => setRejecting(null)} title={t('Rifiuta la richiesta di {who}', { who: rejecting?.user.fullName ?? '' })}>
         <div className="space-y-4">
