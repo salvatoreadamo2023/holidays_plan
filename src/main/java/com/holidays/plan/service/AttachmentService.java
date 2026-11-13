@@ -57,6 +57,12 @@ public class AttachmentService {
         return Objects.equals(actor.getId(), r.getUser().getId());
     }
 
+    /** Interessato, Admin, oppure il PM che puo' gestirne le assenze (es. le ha inserite per suo conto). */
+    private boolean canManageFiles(User actor, AbsenceRequest r) {
+        return isOwner(actor, r) || actor.getRole() == Role.ADMIN
+            || (actor.getRole() == Role.PROJECT_MANAGER && policy.canDecide(actor, r.getUser()));
+    }
+
     private void checkCanSee(User actor, AbsenceRequest r) {
         if (!policy.canSeeDetails(actor, r.getUser())) throw ApiException.notFound();
     }
@@ -65,7 +71,7 @@ public class AttachmentService {
     public AttachmentInfo upload(User actor, Long requestId, MultipartFile file) {
         AbsenceRequest r = loadRequest(requestId);
         checkCanSee(actor, r);
-        if (!isOwner(actor, r) && actor.getRole() != Role.ADMIN) throw ApiException.forbidden();
+        if (!canManageFiles(actor, r)) throw ApiException.forbidden();
         if (r.getStatus() == RequestStatus.WITHDRAWN) throw ApiException.conflict("La richiesta e' stata ritirata");
         if (file == null || file.isEmpty()) throw ApiException.bad("Il file e' vuoto");
         if (file.getSize() > MAX_BYTES) throw ApiException.bad("Il file supera i 5 MB");
@@ -104,7 +110,7 @@ public class AttachmentService {
         Attachment a = loadAttachment(attachmentId);
         AbsenceRequest r = a.getRequest();
         checkCanSee(actor, r);
-        if (!isOwner(actor, r) && actor.getRole() != Role.ADMIN) throw ApiException.forbidden();
+        if (!canManageFiles(actor, r)) throw ApiException.forbidden();
         attachments.delete(a);
         audit.log(actor.getId(), r.getId(), "ATTACHMENT_REMOVED", a.getFilename());
     }

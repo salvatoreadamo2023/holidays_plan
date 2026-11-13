@@ -2,6 +2,7 @@ package com.holidays.plan.service;
 
 import com.holidays.plan.domain.*;
 import com.holidays.plan.repo.AbsenceRequestRepository;
+import com.holidays.plan.repo.UserRepository;
 import com.holidays.plan.web.dto.RequestDtos.CreateRequest;
 import com.holidays.plan.web.dto.RequestDtos.Preview;
 import org.springframework.stereotype.Service;
@@ -21,18 +22,22 @@ public class RequestService {
     static final int MAX_PENDING = 10;
     static final int MAX_DAYS_SPAN = 60;
     static final int SICK_BACKDATE_DAYS = 30;
+    static final int ON_BEHALF_BACKDATE_DAYS = 366;
     static final String AUTO_NOTE = "Approvata automaticamente: nessun responsabile disponibile";
+    static final String SICK_NOTE = "Malattia registrata";
 
     private final AbsenceRequestRepository requests;
+    private final UserRepository users;
     private final HolidayCalendar calendar;
     private final AccessPolicy policy;
     private final AuditService audit;
     private final Notifier notifier;
     private final Clock clock;
 
-    public RequestService(AbsenceRequestRepository requests, HolidayCalendar calendar, 
+    public RequestService(AbsenceRequestRepository requests, UserRepository users, HolidayCalendar calendar,
                           AccessPolicy policy, AuditService audit, Notifier notifier, Clock clock) {
         this.requests = requests;
+        this.users = users;
         this.calendar = calendar;
         this.policy = policy;
         this.audit = audit;
@@ -42,12 +47,16 @@ public class RequestService {
 
     private record Computed(BigDecimal amount, String unit) {}
 
-    private Computed validateAndCompute(User user, CreateRequest in) {
+    private Computed validateAndCompute(User user, CreateRequest in, boolean onBehalf) {
         LocalDate today = LocalDate.now(clock);
+        if (in.halfDay()) throw ApiException.bad("La mezza giornata non e' piu' prevista: usa il permesso a ore");
         if (in.endDate().isBefore(in.startDate())) throw ApiException.bad("La data di fine e' prima della data di inizio");
         if (in.startDate().plusDays(MAX_DAYS_SPAN).isBefore(in.endDate()))
             throw ApiException.bad("Una singola richiesta puo' coprire al massimo " + MAX_DAYS_SPAN + " giorni");
-        if (in.type() == AbsenceType.MALATTIA) {
+        if (onBehalf) {
+            if (in.startDate().isBefore(today.minusDays(ON_BEHALF_BACKDATE_DAYS)))
+                throw ApiException.bad("Si puo' inserire un'assenza al massimo un anno indietro");
+        } else if (in.type() == AbsenceType.MALATTIA) {
             if (in.startDate().isBefore(today.minusDays(SICK_BACKDATE_DAYS)))
                 throw ApiException.bad("La malattia si puo' registrare al massimo " + SICK_BACKDATE_DAYS + " giorni indietro");
         } else if (in.startDate().isBefore(today)) {
@@ -66,12 +75,6 @@ public class RequestService {
                 return new Computed(in.hours(), "ore");
             }
             case FERIE, MALATTIA -> {
-                if (in.halfDay()) {
-                    if (in.type() != AbsenceType.FERIE) throw ApiException.bad("La mezza giornata vale solo per le ferie");
-                    if (!in.startDate().equals(in.endDate())) throw ApiException.bad("La mezza giornata vale per un solo giorno");
-                    if (!calendar.isWorkingDay(in.startDate())) throw ApiException.bad("Il giorno scelto non e' lavorativo");
-                    return new Computed(new BigDecimal("0.5"), "giorni");
-                }
                 BigDecimal days = calendar.workingDays(in.startDate(), in.endDate());
                 if (days.signum() == 0) throw ApiException.bad("Nel periodo scelto non ci sono giorni lavorativi");
                 return new Computed(days, "giorni");
@@ -81,11 +84,13 @@ public class RequestService {
     }
 
     @Transactional(readOnly = true)
-    public Preview preview(User user, CreateRequest in) {
-        Computed c = validateAndCompute(user, in);
+    public Preview preview(User actor, CreateRequest in) {
+        User user = subject(actor, in);
+        boolean onBehalf = user != actor;
+        Computed c = validateAndCompute(user, in, onBehalf);
         List<String> warnings = new ArrayList<>();
         if (requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING))
-            warnings.add("Hai gia' una richiesta in quei giorni");
+            warnings.add(onBehalf ? user.getFullName() + " ha gia' un'assenza in quei giorni" : "Hai gia' una richiesta in quei giorni");
         List<String> colleagues = colleaguesAbsent(user, in.startDate(), in.endDate());
         return new Preview(c.amount(), c.unit(), null, colleagues, warnings);
     }
@@ -99,8 +104,10 @@ public class RequestService {
     }
 
     @Transactional
-    public AbsenceRequest create(User user, CreateRequest in) {
-        Computed c = validateAndCompute(user, in);
+    public AbsenceRequest create(User actor, CreateRequest in) {
+        User user = subject(actor, in);
+        if (user != actor) return createOnBehalf(actor, user, in);
+        Computed c = validateAndCompute(user, in, false);
         if (requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING))
             throw ApiException.conflict("Hai gia' una richiesta che si sovrappone a queste date");
         long pending = requests.findByUser(user.getId()).stream()
@@ -114,13 +121,20 @@ public class RequestService {
         r.setStatus(RequestStatus.PENDING);
         r.setStartDate(in.startDate());
         r.setEndDate(in.endDate());
-        r.setHalfDay(in.type() == AbsenceType.FERIE && in.halfDay());
+        r.setHalfDay(false);
         r.setHours(in.type() == AbsenceType.PERMESSO ? in.hours() : null);
         r.setAmount(c.amount());
         r.setNote(blankToNull(in.note()));
         r = requests.save(r);
         audit.log(user.getId(), r.getId(), "CREATED", in.type() + " " + in.startDate() + " -> " + in.endDate());
-        if (notifier.approversOf(user).isEmpty()) {
+        if (in.type() == AbsenceType.MALATTIA) {
+            // La malattia non si chiede, si comunica: registrata subito, i responsabili vengono avvisati.
+            r.setStatus(RequestStatus.APPROVED);
+            r.setDecidedAt(Instant.now(clock));
+            r.setDecisionNote(SICK_NOTE);
+            audit.log(null, r.getId(), "SICK_RECORDED", SICK_NOTE);
+            notifier.sickRecorded(r);
+        } else if (notifier.approversOf(user).isEmpty()) {
             // Nessuno puo' decidere (es. unico Admin): approvazione automatica, tracciata nello storico.
             r.setStatus(RequestStatus.APPROVED);
             r.setDecidedAt(Instant.now(clock));
@@ -130,6 +144,49 @@ public class RequestService {
             notifier.created(r);
         }
         return r;
+    }
+
+    /** Per chi e' l'assenza: se stessi, oppure (solo Admin/PM con competenza) un'altra persona. */
+    private User subject(User actor, CreateRequest in) {
+        if (in.forUserId() == null || Objects.equals(in.forUserId(), actor.getId())) return actor;
+        User target = users.findById(in.forUserId()).filter(User::isActive).orElseThrow(ApiException::notFound);
+        if (!canInsertFor(actor, target)) throw ApiException.forbidden();
+        return target;
+    }
+
+    private boolean canInsertFor(User actor, User target) {
+        return (actor.getRole() == Role.ADMIN || actor.getRole() == Role.PROJECT_MANAGER) && policy.canDecide(actor, target);
+    }
+
+    private AbsenceRequest createOnBehalf(User actor, User user, CreateRequest in) {
+        Computed c = validateAndCompute(user, in, true);
+        if (requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING))
+            throw ApiException.conflict(user.getFullName() + " ha gia' un'assenza che si sovrappone a queste date");
+        AbsenceRequest r = new AbsenceRequest();
+        r.setUser(user);
+        r.setType(in.type());
+        r.setStatus(RequestStatus.APPROVED);
+        r.setStartDate(in.startDate());
+        r.setEndDate(in.endDate());
+        r.setHalfDay(false);
+        r.setHours(in.type() == AbsenceType.PERMESSO ? in.hours() : null);
+        r.setAmount(c.amount());
+        r.setNote(blankToNull(in.note()));
+        r.setDecidedBy(actor);
+        r.setDecidedAt(Instant.now(clock));
+        r.setDecisionNote("Inserita da " + actor.getFullName());
+        r = requests.save(r);
+        audit.log(actor.getId(), r.getId(), "CREATED_ON_BEHALF",
+            user.getFullName() + ": " + in.type() + " " + in.startDate() + " -> " + in.endDate());
+        notifier.insertedForYou(r, actor);
+        return r;
+    }
+
+    /** Persone per cui questo utente puo' inserire un'assenza (vuoto per chi non puo'). */
+    @Transactional(readOnly = true)
+    public List<User> insertableFor(User actor) {
+        if (actor.getRole() != Role.ADMIN && actor.getRole() != Role.PROJECT_MANAGER) return List.of();
+        return users.findByActiveTrueOrderByFullName().stream().filter(u -> canInsertFor(actor, u)).toList();
     }
 
     private AbsenceRequest load(Long id) {

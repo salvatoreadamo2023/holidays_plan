@@ -34,7 +34,7 @@ public class HolidayCalendar {
     }
 
     /** Domenica di Pasqua (algoritmo di Meeus/Jones/Butcher). */
-    static LocalDate easter(int year) {
+    public static LocalDate easter(int year) {
         int a = year % 19, b = year / 100, c = year % 100, d = b / 4, e = b % 4;
         int f = (b + 8) / 25, g = (b - f + 1) / 3, h = (19 * a + b - d - g + 15) % 30;
         int i = c / 4, k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;

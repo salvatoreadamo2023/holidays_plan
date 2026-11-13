@@ -21,13 +21,15 @@ public class AdminService {
     private final AreaRepository areas;
     private final TeamRepository teams;
     private final CompanyHolidayRepository companyHolidays;
+    private final AbsenceRequestRepository requests;
     private final HolidayCalendar calendar;
     private final PasswordEncoder encoder;
     private final AuditService audit;
 
     public AdminService(UserRepository users, AreaRepository areas, TeamRepository teams,
-                        CompanyHolidayRepository companyHolidays, HolidayCalendar calendar,
-                        PasswordEncoder encoder, AuditService audit) {
+                        CompanyHolidayRepository companyHolidays, AbsenceRequestRepository requests,
+                        HolidayCalendar calendar, PasswordEncoder encoder, AuditService audit) {
+        this.requests = requests;
         this.users = users;
         this.areas = areas;
         this.teams = teams;
@@ -154,11 +156,31 @@ public class AdminService {
         CompanyHoliday h = new CompanyHoliday();
         h.setDate(in.date());
         h.setName(in.name().trim());
-        h = companyHolidays.save(h);
+        h = companyHolidays.saveAndFlush(h);
+        recomputeDays(h.getDate());
         return new HolidayView(h.getId(), h.getDate(), h.getName(), false);
     }
 
     public void deleteHoliday(Long id) {
-        companyHolidays.delete(companyHolidays.findById(id).orElseThrow(ApiException::notFound));
+        CompanyHoliday h = companyHolidays.findById(id).orElseThrow(ApiException::notFound);
+        LocalDate date = h.getDate();
+        companyHolidays.delete(h);
+        companyHolidays.flush();
+        recomputeDays(date);
+    }
+
+    /** Ricalcola i giorni delle ferie/malattie attive che toccano una chiusura aggiunta o tolta. */
+    int recomputeDays(LocalDate date) {
+        int changed = 0;
+        for (AbsenceRequest r : requests.findOverlapping(date, date, RequestStatus.BLOCKING)) {
+            if (r.getType() == AbsenceType.PERMESSO || r.isHalfDay()) continue;
+            BigDecimal days = calendar.workingDays(r.getStartDate(), r.getEndDate());
+            if (r.getAmount() == null || days.compareTo(r.getAmount()) != 0) {
+                audit.log(null, r.getId(), "DAYS_RECOMPUTED", r.getAmount() + " -> " + days + " (chiusura del " + date + ")");
+                r.setAmount(days);
+                changed++;
+            }
+        }
+        return changed;
     }
 }

@@ -47,7 +47,7 @@ export interface CalendarView {
 
 export interface Preview { amount: number; unit: string; availableAfter: number | null; colleaguesAbsent: string[]; warnings: string[] }
 
-export interface CreateRequest { type: AbsenceType; startDate: string; endDate: string; halfDay: boolean; hours: number | null; note: string }
+export interface CreateRequest { type: AbsenceType; startDate: string; endDate: string; halfDay?: boolean; hours: number | null; note: string; forUserId?: number | null }
 
 export interface UserAdmin {
   id: number; username: string; email: string; fullName: string; role: Role

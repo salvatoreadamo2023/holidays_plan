@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import clsx from 'clsx'
 import { api } from '../lib/api'
 import { iso, num, typeEmoji, typeLabel } from '../lib/format'
-import type { AbsenceType, CreateRequest, Preview } from '../lib/types'
+import type { AbsenceType, CreateRequest, Preview, UserSummary } from '../lib/types'
 import { useUi } from '../lib/ui'
 import { Avatar, Button, Field, inputCls, Modal } from './ui'
 import { ACCEPT, MAX_MB, uploadAttachment } from './Attachments'
@@ -23,18 +23,25 @@ export function NewRequestDrawer() {
   const { requestOpen, closeRequest, draft } = useUi()
   const qc = useQueryClient()
   const today = iso(new Date())
-  const [form, setForm] = useState<CreateRequest>({ type: 'FERIE', startDate: today, endDate: today, halfDay: false, hours: 2, note: '' })
+  const [form, setForm] = useState<CreateRequest>({ type: 'FERIE', startDate: today, endDate: today, hours: 2, note: '', forUserId: null })
 
   useEffect(() => {
     if (requestOpen) setForm(f => ({ ...f, startDate: draft.startDate ?? today, endDate: draft.endDate ?? draft.startDate ?? today, note: '' }))
   }, [requestOpen, draft, today])
 
-  const single = form.type === 'PERMESSO' || form.halfDay
+  // Admin e PM possono inserire un'assenza per conto di una persona del proprio team (gia' approvata).
+  const people = useQuery({
+    queryKey: ['on-behalf-people'],
+    queryFn: () => api<UserSummary[]>('/api/requests/on-behalf/people'),
+    enabled: requestOpen, staleTime: 5 * 60_000,
+  })
+  const forOther = !!form.forUserId
+  const single = form.type === 'PERMESSO'
   const payload: CreateRequest = {
     ...form,
     endDate: single ? form.startDate : form.endDate,
-    halfDay: form.type === 'FERIE' && form.halfDay,
     hours: form.type === 'PERMESSO' ? form.hours : null,
+    forUserId: form.forUserId || null,
   }
   const debounced = useDebounced(payload)
   const preview = useQuery({
@@ -56,7 +63,10 @@ export function NewRequestDrawer() {
       return r
     },
     onSuccess: () => {
-      toast.success('Richiesta inviata', { description: 'Il tuo responsabile riceverà la notifica.' })
+      const who = people.data?.find(u => u.id === payload.forUserId)?.fullName
+      if (who) toast.success('Assenza inserita', { description: `Registrata per ${who}, già approvata.` })
+      else if (payload.type === 'MALATTIA') toast.success('Malattia registrata', { description: 'I responsabili sono stati avvisati.' })
+      else toast.success('Richiesta inviata', { description: 'Il tuo responsabile riceverà la notifica.' })
       qc.invalidateQueries(); closeRequest()
     },
     onError: (e: Error) => toast.error(e.message),
@@ -69,6 +79,14 @@ export function NewRequestDrawer() {
   return (
     <Modal open={requestOpen} onClose={closeRequest} title="Nuova richiesta" side>
       <div className="space-y-6">
+        {!!people.data?.length && (
+          <Field label="Per chi" hint={forOther ? "L'assenza viene registrata già approvata e la persona riceve un avviso. Puoi inserire anche date passate." : undefined}>
+            <select className={inputCls} value={form.forUserId ?? ''} onChange={e => set('forUserId', e.target.value ? Number(e.target.value) : null)}>
+              <option value="">Per me</option>
+              {people.data.map(u => <option key={u.id} value={u.id}>{u.fullName}{u.teamName ? ` · ${u.teamName}` : ''}</option>)}
+            </select>
+          </Field>
+        )}
         <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Tipo di assenza">
           {types.map(t => (
             <button
@@ -95,14 +113,6 @@ export function NewRequestDrawer() {
             </Field>
           )}
         </div>
-
-        {form.type === 'FERIE' && (
-          <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-soft px-4 py-3">
-            <span className="text-sm font-medium">Solo mezza giornata</span>
-            <input type="checkbox" className="peer sr-only" checked={form.halfDay} onChange={e => set('halfDay', e.target.checked)} />
-            <span className="relative h-6 w-11 rounded-full bg-[var(--grid)] transition peer-checked:bg-violet-500 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" />
-          </label>
-        )}
 
         {form.type === 'PERMESSO' && (
           <Field label={`Ore di permesso: ${num(form.hours)}`}>
@@ -155,7 +165,7 @@ export function NewRequestDrawer() {
 
         <Button variant="primary" className="w-full py-3.5 text-base" disabled={create.isPending || !!err || !p || p.warnings.length > 0}
           onClick={() => create.mutate()}>
-          {create.isPending ? 'Invio…' : 'Invia richiesta'}
+          {create.isPending ? 'Invio…' : forOther ? 'Inserisci assenza' : form.type === 'MALATTIA' ? 'Registra malattia' : 'Invia richiesta'}
         </Button>
       </div>
     </Modal>

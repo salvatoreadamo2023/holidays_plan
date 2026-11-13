@@ -17,14 +17,22 @@ public class AccessPolicy {
         return a.areaId() != null && Objects.equals(a.areaId(), b.areaId());
     }
 
-    /** Puo' approvare/rifiutare le richieste di {@code target}? */
+    public boolean sameTeam(User a, User b) {
+        return a.teamId() != null && Objects.equals(a.teamId(), b.teamId());
+    }
+
+    /**
+     * Puo' approvare/rifiutare le richieste di {@code target}?
+     * Tech Lead: i dipendenti del proprio team. PM: dipendenti e Tech Lead del proprio team
+     * (se il PM non ha un team, quelli della sua area). Admin: tutti tranne se stesso.
+     */
     public boolean canDecide(User actor, User target) {
         if (actor == null || target == null || Objects.equals(actor.getId(), target.getId())) return false;
         return switch (actor.getRole()) {
             case ADMIN -> true;
-            case PROJECT_MANAGER -> sameArea(actor, target)
-                && (target.getRole() == Role.USER || target.getRole() == Role.TEAM_LEAD);
-            case TEAM_LEAD -> sameArea(actor, target) && target.getRole() == Role.USER;
+            case PROJECT_MANAGER -> (target.getRole() == Role.USER || target.getRole() == Role.TEAM_LEAD)
+                && (actor.teamId() != null ? sameTeam(actor, target) : sameArea(actor, target));
+            case TEAM_LEAD -> target.getRole() == Role.USER && sameTeam(actor, target);
             case USER -> false;
         };
     }

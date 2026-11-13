@@ -36,6 +36,13 @@ public class RequestController {
         return views.one(service.create(currentUser.get(), in));
     }
 
+    /** Persone per cui l'utente (Admin/PM) puo' inserire un'assenza gia' approvata. */
+    @GetMapping("/on-behalf/people")
+    @Transactional(readOnly = true)
+    public List<com.holidays.plan.web.dto.UserSummary> onBehalfPeople() {
+        return service.insertableFor(currentUser.get()).stream().map(com.holidays.plan.web.dto.UserSummary::of).toList();
+    }
+
     @GetMapping("/mine")
     @Transactional(readOnly = true)
     public List<RequestView> mine() {

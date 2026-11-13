@@ -23,7 +23,9 @@ public final class RequestDtos {
         @NotNull LocalDate endDate,
         boolean halfDay,
         @DecimalMin("0.5") @DecimalMax("8") BigDecimal hours,
-        @Size(max = 500) String note) {}
+        @Size(max = 500) String note,
+        /** Solo Admin/PM: inserisce l'assenza per conto di questa persona, gia' approvata. */
+        Long forUserId) {}
 
     public record Decision(@Size(max = 500) String note) {}
 

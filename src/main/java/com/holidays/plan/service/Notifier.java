@@ -71,6 +71,14 @@ public class Notifier {
             what(r), data(r, "Richieste"));
     }
 
+    public void sickRecorded(AbsenceRequest r) {
+        push.notify(approversOf(r.getUser()), r.getUser().getFullName() + " in malattia", what(r), data(r, "Calendario"));
+    }
+
+    public void insertedForYou(AbsenceRequest r, User by) {
+        push.notify(List.of(r.getUser().getId()), "Assenza inserita per te", what(r) + " · da " + by.getFullName(), data(r, "Richieste"));
+    }
+
     public void certificateMissing(AbsenceRequest r) {
         push.notify(List.of(r.getUser().getId()), "Manca il certificato",
             "Allega il certificato alla malattia del " + D.format(r.getStartDate()) + ".", data(r, "Richieste"));

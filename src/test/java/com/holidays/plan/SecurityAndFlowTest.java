@@ -34,7 +34,18 @@ class SecurityAndFlowTest {
     private static final AtomicInteger WEEK = new AtomicInteger(8);
 
     private static LocalDate freshMonday() {
-        return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY)).plusWeeks(WEEK.getAndIncrement());
+        // Salta le settimane con una festivita' (Pasquetta, Natale...): i test vogliono 5 giorni lavorativi pieni.
+        while (true) {
+            LocalDate m = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY)).plusWeeks(WEEK.getAndIncrement());
+            boolean free = true;
+            for (int i = 0; i < 5; i++) {
+                LocalDate x = m.plusDays(i);
+                if (x.equals(com.holidays.plan.service.HolidayCalendar.easter(x.getYear()).plusDays(1))
+                    || java.util.Set.of("01-01", "01-06", "04-25", "05-01", "06-02", "08-15", "11-01", "12-08", "12-25", "12-26")
+                        .contains(String.format("%02d-%02d", x.getMonthValue(), x.getDayOfMonth()))) free = false;
+            }
+            if (free) return m;
+        }
     }
 
     private String token(String username) throws Exception {
@@ -93,7 +104,7 @@ class SecurityAndFlowTest {
     }
 
     @Test
-    void techLeadDellAreaApprovaUnoUser_altraAreaNo() throws Exception {
+    void techLeadDelTeamApprovaUnoUser_altroTeamNo() throws Exception {
         LocalDate d = freshMonday();
         long id = createFerie(token("user"), d, d.plusDays(1));
         // PM di un'altra area: vietato
@@ -102,8 +113,11 @@ class SecurityAndFlowTest {
         // L'utente stesso: vietato
         mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("user")))
             .andExpect(status().isForbidden());
-        // TL di un altro team ma stessa area: consentito (gestisce l'area)
+        // TL di un altro team (stessa area): vietato, decide solo sul proprio team
         mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("techlead2")))
+            .andExpect(status().isForbidden());
+        // TL dello stesso team: consentito
+        mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("techlead")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
         // Gia' decisa: conflitto
         mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("pm")))
@@ -352,5 +366,86 @@ class SecurityAndFlowTest {
         mvc.perform(post("/api/requests").header("Authorization", token("andrea")).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", freshMonday().toString(), "endDate", freshMonday().minusWeeks(1).plusDays(1).toString()))))
             .andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    @Test
+    void malattiaRegistrataSubito_senzaApprovazione() throws Exception {
+        LocalDate d = freshMonday();
+        mvc.perform(post("/api/requests").header("Authorization", token("davide")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "MALATTIA", "startDate", d.toString(), "endDate", d.plusDays(1).toString()))))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("APPROVED"))
+            .andExpect(jsonPath("$.decisionNote").value("Malattia registrata"));
+    }
+
+    @Test
+    void mezzaGiornataNonPiuPrevista() throws Exception {
+        LocalDate d = freshMonday();
+        mvc.perform(post("/api/requests").header("Authorization", token("user")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", d.toString(), "endDate", d.toString(), "halfDay", true))))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void pmDecideSoloIlProprioTeam_tlNoAltroTeam() throws Exception {
+        LocalDate d = freshMonday();
+        long id = createFerie(token("davide"), d, d); // team mobile
+        mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("techlead")))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/api/requests/" + id + "/approve").header("Authorization", token("techlead2")))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void perContoDi_adminEPm_giaApprovata_userNo() throws Exception {
+        String admin = token("admin");
+        String people = mvc.perform(get("/api/requests/on-behalf/people").header("Authorization", token("pm2")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(people).contains("andrea").doesNotContain("\"username\":\"user\"");
+        mvc.perform(get("/api/requests/on-behalf/people").header("Authorization", token("user")))
+            .andExpect(status().isOk()).andExpect(content().json("[]"));
+        long sara = userId(admin, "sara");
+        // Data passata ammessa per conto di
+        LocalDate past = LocalDate.now().minusDays(20);
+        while (past.getDayOfWeek().getValue() > 5) past = past.minusDays(1);
+        mvc.perform(post("/api/requests").header("Authorization", admin).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", past.toString(), "endDate", past.toString(), "forUserId", sara))))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("APPROVED"))
+            .andExpect(jsonPath("$.user.username").value("sara")).andExpect(jsonPath("$.decidedBy").exists());
+        // PM di un'altra area: vietato
+        mvc.perform(post("/api/requests").header("Authorization", token("pm2")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", freshMonday().toString(), "endDate", freshMonday().toString(), "forUserId", sara))))
+            .andExpect(status().isForbidden());
+        // Un TL non puo' inserire per conto di altri
+        mvc.perform(post("/api/requests").header("Authorization", token("techlead")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", freshMonday().toString(), "endDate", freshMonday().toString(), "forUserId", sara))))
+            .andExpect(status().isForbidden());
+    }
+
+    private long userId(String admin, String username) throws Exception {
+        JsonNode all = json.readTree(mvc.perform(get("/api/admin/users").header("Authorization", admin))
+            .andReturn().getResponse().getContentAsString());
+        for (JsonNode u : all) if (u.get("username").asText().equals(username)) return u.get("id").asLong();
+        throw new IllegalStateException(username);
+    }
+
+    @Test
+    void chiusuraAziendale_ricalcolaIGiorni() throws Exception {
+        LocalDate d = freshMonday();
+        long id = createFerie(token("sara"), d, d.plusDays(4));
+        String admin = token("admin");
+        String h = mvc.perform(post("/api/admin/holidays").header("Authorization", admin).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("date", d.plusDays(2).toString(), "name", "Chiusura test"))))
+            .andExpect(status().is2xxSuccessful()).andReturn().getResponse().getContentAsString();
+        assertThat(amountOf("sara", id)).isEqualByComparingTo("4");
+        mvc.perform(delete("/api/admin/holidays/" + json.readTree(h).get("id").asLong()).header("Authorization", admin))
+            .andExpect(status().is2xxSuccessful());
+        assertThat(amountOf("sara", id)).isEqualByComparingTo("5");
+    }
+
+    private java.math.BigDecimal amountOf(String username, long id) throws Exception {
+        for (JsonNode r : json.readTree(mvc.perform(get("/api/requests/mine").header("Authorization", token(username)))
+                .andReturn().getResponse().getContentAsString()))
+            if (r.get("id").asLong() == id) return r.get("amount").decimalValue();
+        throw new IllegalStateException();
     }
 }
