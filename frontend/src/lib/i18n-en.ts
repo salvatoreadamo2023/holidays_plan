@@ -1,5 +1,6 @@
 /** Dizionario inglese: chiave = testo italiano mostrato nell'interfaccia. */
 export const EN: Record<string, string> = {
+  'Pagina {p}': 'Page {p}',
   'Cerca persona o team…': 'Search person or team…',
   '{from}–{to} di {n}': '{from}–{to} of {n}',
   'Pagina precedente': 'Previous page',

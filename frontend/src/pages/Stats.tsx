@@ -6,7 +6,7 @@ import clsx from 'clsx'
 import { api } from '../lib/api'
 import { fmt, num, reasonLabel, typeEmoji, typeLabel } from '../lib/format'
 import type { LeaveReason } from '../lib/types'
-import { Avatar, Card, Empty } from '../components/ui'
+import { Avatar, Card, Empty, Pager, usePaged } from '../components/ui'
 import { t, t as tt } from '../lib/i18n'
 
 type T = 'FERIE' | 'PERMESSO' | 'GENERAL_LEAVE' | 'CLIENT_OFFICE' | 'BUSINESS_TRIP'
@@ -81,6 +81,7 @@ export default function StatsPage() {
   }, [scopeTypes, shown.join()])
 
   const teamsShown = (s?.teams ?? []).filter(t => team === 'ALL' || teamKey(t.id) === team)
+  const tpg = usePaged(teamsShown, 10, team)
   const out = (s?.outToday ?? []).filter(o => !selTeam || o.team === selTeam.name || (selTeam.id == null && !o.team))
   const reasons = ((selTeam ? selTeam.reasons : s?.reasons) ?? []).map(r => ({ ...r, v: val(r.series) })).filter(r => r.v > 0).sort((a, b) => b.v - a.v)
   const reasonTot = reasons.reduce((a, r) => a + r.v, 0)
@@ -206,7 +207,7 @@ export default function StatsPage() {
                 <th className="pl-4">{t('Composizione')}</th><th className="text-right">{t('Gg assenza / pers.')}</th><th className="pl-4">{t('Fuori oggi')}</th>
               </tr></thead>
               <tbody>
-                {teamsShown.map(tm => {
+                {tpg.rows.map(tm => {
                   const parts = shown.map(x => ({ x, v: asDays(x, val(tm.types[x])) }))
                   const tot = parts.reduce((a, p) => a + p.v, 0)
                   const maxTot = Math.max(1, ...teamsShown.map(o => shown.reduce((a, x) => a + asDays(x, val(o.types[x])), 0)))
@@ -228,6 +229,7 @@ export default function StatsPage() {
                 })}
               </tbody>
             </table>
+            <Pager pg={tpg} className="mt-3" />
           </Card>
 
           <div className="grid gap-6 lg:grid-cols-3">

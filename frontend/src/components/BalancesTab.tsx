@@ -40,6 +40,7 @@ export function BalancesTab() {
     onError: (e: Error) => toast.error(e.message),
   })
   const getTemplate = () => download('/api/admin/balances/template', 'saldi-residui.xlsx').catch((e: Error) => toast.error(e.message))
+  const ppg = usePaged(preview?.rows ?? [], 10, preview)
   const [q, setQ] = useState('')
   const filtered = list.filter(b => `${b.fullName} ${b.team ?? ''}`.toLowerCase().includes(q.toLowerCase()))
   const pg = usePaged(filtered, 10, q)
@@ -77,13 +78,13 @@ export function BalancesTab() {
             {preview.errors > 0 && <span className="rounded-full bg-rose-500/15 px-3 py-1 font-semibold text-rose-600 dark:text-rose-300">{t('{n} con errori (non verranno caricate)', { n: preview.errors })}</span>}
             {preview.missing > 0 && <span className="rounded-full bg-amber-500/15 px-3 py-1 font-semibold text-amber-700 dark:text-amber-300">{t('{n} persone non presenti nel file (resta il saldo precedente)', { n: preview.missing })}</span>}
           </div>
-          <div className="max-h-[420px] overflow-auto scrollbar-thin">
+          <div className="overflow-auto scrollbar-thin">
             <table className="w-full min-w-[560px] text-sm">
               <thead className="sticky top-0 bg-[var(--surface-strong)] text-left text-xs uppercase tracking-wide text-muted">
                 <tr><th className="py-2 pr-3">{t('Riga')}</th><th className="pr-3">Username</th><th className="pr-3">{t('Persona')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th><th></th></tr>
               </thead>
               <tbody>
-                {preview.rows.map(r => (
+                {ppg.rows.map(r => (
                   <tr key={r.row} className="border-t border-soft">
                     <td className="py-2 pr-3 text-muted">{r.row}</td>
                     <td className="pr-3 font-mono text-xs">{r.username}</td>
@@ -98,6 +99,7 @@ export function BalancesTab() {
               </tbody>
             </table>
           </div>
+          <Pager pg={ppg} className="mt-3" />
         </Card>
       )}
 

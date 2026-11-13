@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Building2, CalendarHeart, History, Wallet, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
+import { Building2, CalendarHeart, ChevronLeft, ChevronRight, History, Wallet, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
@@ -247,6 +247,7 @@ function HolidaysTab() {
     mutationFn: (id: number) => api(`/api/admin/holidays/${id}`, { method: 'DELETE' }),
     onSuccess: () => invalidate(),
   })
+  const hpg = usePaged(q.data ?? [], 10, year)
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Card className="lg:col-span-2">
@@ -254,7 +255,7 @@ function HolidaysTab() {
           <Button onClick={() => setYear(y => y - 1)}>‹</Button><span className="font-display text-lg font-semibold">{year}</span><Button onClick={() => setYear(y => y + 1)}>›</Button>
         </div>
         <ul className="grid gap-2 sm:grid-cols-2">
-          {q.data?.map(h => (
+          {hpg.rows.map(h => (
             <li key={h.date} className="flex items-center gap-3 rounded-2xl border border-soft p-3">
               <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-500/10 text-center leading-none text-rose-500">
                 <div><div className="text-base font-bold">{fmt(h.date, 'd')}</div><div className="text-[10px] uppercase">{fmt(h.date, 'MMM')}</div></div>
@@ -264,6 +265,7 @@ function HolidaysTab() {
             </li>
           ))}
         </ul>
+        <Pager pg={hpg} className="mt-4" />
       </Card>
       <Card>
         <h3 className="font-display text-lg font-semibold">{t('Aggiungi chiusura')}</h3>
@@ -286,7 +288,7 @@ export const auditLabel: Record<string, string> = {
   USER_CREATED: 'ha creato un utente', USER_UPDATED: 'ha modificato un utente', PASSWORD_RESET: 'ha reimpostato una password', CONVERTED: 'ha trasformato le ferie ipotetiche in richiesta', BALANCES_UPLOADED: 'ha caricato i saldi residui', AMEND_REQUESTED: 'ha chiesto una rettifica', AMENDED_BY_MANAGER: 'ha rettificato un\'assenza', AMENDED: 'sostituita dalla rettifica', REVOKED: 'ha annullato un\'assenza',
 }
 
-const AUDIT_PAGE = 50
+const AUDIT_PAGE = 10
 
 function AuditTab() {
   const [s, setS] = useState('')
@@ -299,12 +301,23 @@ function AuditTab() {
     queryFn: ({ pageParam }) => api<AuditRow[]>(`/api/admin/audit?size=${AUDIT_PAGE}${pageParam ? `&before=${pageParam}` : ''}${term ? `&q=${encodeURIComponent(term)}` : ''}`),
     getNextPageParam: last => (last.length < AUDIT_PAGE ? null : last[last.length - 1].id),
   })
-  const list = (q.data?.pages ?? []).flat()
+  // 10 operazioni per pagina: la pagina successiva si chiede al server solo quando serve.
+  const [page, setPage] = useState(0)
+  useEffect(() => { setPage(0) }, [term])
+  const pages = q.data?.pages ?? []
+  const list = (pages[Math.min(page, Math.max(0, pages.length - 1))] ?? []) as AuditRow[]
+  const canNext = page < pages.length - 1 || q.hasNextPage
+  const next = async () => {
+    if (page >= pages.length - 1) {
+      const r = await q.fetchNextPage()
+      if (!r.data?.pages.at(-1)?.length) return
+    }
+    setPage(page + 1)
+  }
   return (
     <Card>
       <div className="mb-4 flex items-center gap-3">
         <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input className={`${inputCls} pl-9`} placeholder={t('Cerca persona o dettaglio')} value={s} onChange={e => setS(e.target.value)} /></div>
-        <span className="text-xs text-muted">{list.length} {t('operazioni')}{q.hasNextPage ? ` ${t('(ce ne sono altre)')}` : ''}</span>
       </div>
       {q.data && !list.length && <p className="py-6 text-center text-sm text-muted">{t('Nessuna operazione trovata.')}</p>}
       <ul className="divide-y divide-[var(--border)]">
@@ -319,9 +332,11 @@ function AuditTab() {
           </li>
         ))}
       </ul>
-      {q.hasNextPage && (
-        <div className="mt-4 flex justify-center">
-          <Button onClick={() => q.fetchNextPage()} disabled={q.isFetchingNextPage}>{q.isFetchingNextPage ? t('Caricamento…') : t('Carica altre operazioni')}</Button>
+      {(page > 0 || canNext) && (
+        <div className="mt-4 flex items-center justify-end gap-2 text-sm text-muted">
+          <button className="rounded-lg border border-soft p-1.5 transition hover:bg-black/5 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-white/5" disabled={page === 0} onClick={() => setPage(page - 1)} aria-label={t('Pagina precedente')}><ChevronLeft size={16} /></button>
+          <span className="tabular-nums">{t('Pagina {p}', { p: page + 1 })}</span>
+          <button className="rounded-lg border border-soft p-1.5 transition hover:bg-black/5 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-white/5" disabled={!canNext || q.isFetchingNextPage} onClick={next} aria-label={t('Pagina successiva')}><ChevronRight size={16} /></button>
         </div>
       )}
     </Card>
