@@ -274,7 +274,7 @@ type AuditRow = { id: number; createdAt: string; action: string; actorName: stri
 export const auditLabel: Record<string, string> = {
   CREATED: 'ha creato una richiesta', APPROVED: 'ha approvato', REJECTED: 'ha rifiutato', WITHDRAWN: 'ha ritirato',
   CANCEL_REQUESTED: "ha chiesto l'annullamento", CANCELLED: "ha confermato l'annullamento", CANCEL_DENIED: "ha respinto l'annullamento",
-  ATTACHMENT_ADDED: 'ha allegato un file', ATTACHMENT_REMOVED: 'ha tolto un allegato', CERTIFICATE_REMINDER: 'promemoria certificato inviato',
+  ATTACHMENT_ADDED: 'ha allegato un file', ATTACHMENT_REMOVED: 'ha tolto un allegato', CERTIFICATE_REMINDER: 'promemoria certificato inviato', AUTO_APPROVED: 'approvazione automatica (nessun responsabile)', AUTO_CANCELLED: 'annullamento automatico (nessun responsabile)',
   USER_CREATED: 'ha creato un utente', USER_UPDATED: 'ha modificato un utente', PASSWORD_RESET: 'ha reimpostato una password',
 }
 

@@ -20,9 +20,21 @@ import java.util.EnumSet;
 @Service
 public class BalanceService {
     private final AbsenceRequestRepository requests;
+    private final HolidayCalendar calendar;
 
-    public BalanceService(AbsenceRequestRepository requests) {
+    public BalanceService(AbsenceRequestRepository requests, HolidayCalendar calendar) {
         this.requests = requests;
+        this.calendar = calendar;
+    }
+
+    /** Parte della richiesta che cade nel periodo: una ferie 28 dic - 3 gen conta per ciascun anno i suoi giorni. */
+    public BigDecimal amountIn(com.holidays.plan.domain.AbsenceRequest r, LocalDate from, LocalDate to) {
+        if (r.getType() == AbsenceType.PERMESSO || r.isHalfDay()) {
+            return r.getStartDate().isBefore(from) || r.getStartDate().isAfter(to) ? BigDecimal.ZERO : r.getAmount();
+        }
+        LocalDate s = r.getStartDate().isBefore(from) ? from : r.getStartDate();
+        LocalDate e = r.getEndDate().isAfter(to) ? to : r.getEndDate();
+        return e.isBefore(s) ? BigDecimal.ZERO : calendar.workingDays(s, e);
     }
 
     private BigDecimal sum(User u, AbsenceType t, EnumSet<RequestStatus> st, int year) {
@@ -48,15 +60,21 @@ public class BalanceService {
     private static final BigDecimal HOURS_PER_DAY = new BigDecimal("8");
 
     public TrendView trend(User u, int year) {
-        EnumSet<RequestStatus> active = EnumSet.copyOf(RequestStatus.ACTIVE);
-        EnumSet<RequestStatus> pending = EnumSet.of(RequestStatus.PENDING);
-        BigDecimal leave = sum(u, AbsenceType.FERIE, active, year);
-        BigDecimal permit = sum(u, AbsenceType.PERMESSO, active, year);
-        BigDecimal sick = sum(u, AbsenceType.MALATTIA, active, year);
-        BigDecimal total = leave.add(sick).add(permit.divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP));
-        return new TrendView(year,
-            leave, sum(u, AbsenceType.FERIE, pending, year),
-            permit, sum(u, AbsenceType.PERMESSO, pending, year),
-            sick, total);
+        LocalDate from = LocalDate.of(year, 1, 1), to = LocalDate.of(year, 12, 31);
+        int n = AbsenceType.values().length;
+        BigDecimal[] ok = new BigDecimal[n], wait = new BigDecimal[n];
+        java.util.Arrays.fill(ok, BigDecimal.ZERO);
+        java.util.Arrays.fill(wait, BigDecimal.ZERO);
+        for (var r : requests.findByUser(u.getId())) {
+            if (r.getEndDate().isBefore(from) || r.getStartDate().isAfter(to)) continue;
+            BigDecimal[] target = RequestStatus.ACTIVE.contains(r.getStatus()) ? ok
+                : r.getStatus() == RequestStatus.PENDING ? wait : null;
+            if (target == null) continue;
+            int i = r.getType().ordinal();
+            target[i] = target[i].add(amountIn(r, from, to));
+        }
+        int f = AbsenceType.FERIE.ordinal(), p = AbsenceType.PERMESSO.ordinal(), m = AbsenceType.MALATTIA.ordinal();
+        BigDecimal total = ok[f].add(ok[m]).add(ok[p].divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP));
+        return new TrendView(year, ok[f], wait[f], ok[p], wait[p], ok[m], total);
     }
 }

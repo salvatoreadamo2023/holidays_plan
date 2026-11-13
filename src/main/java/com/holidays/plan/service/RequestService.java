@@ -21,6 +21,7 @@ public class RequestService {
     static final int MAX_PENDING = 10;
     static final int MAX_DAYS_SPAN = 60;
     static final int SICK_BACKDATE_DAYS = 30;
+    static final String AUTO_NOTE = "Approvata automaticamente: nessun responsabile disponibile";
 
     private final AbsenceRequestRepository requests;
     private final HolidayCalendar calendar;
@@ -119,7 +120,15 @@ public class RequestService {
         r.setNote(blankToNull(in.note()));
         r = requests.save(r);
         audit.log(user.getId(), r.getId(), "CREATED", in.type() + " " + in.startDate() + " -> " + in.endDate());
-        notifier.created(r);
+        if (notifier.approversOf(user).isEmpty()) {
+            // Nessuno puo' decidere (es. unico Admin): approvazione automatica, tracciata nello storico.
+            r.setStatus(RequestStatus.APPROVED);
+            r.setDecidedAt(Instant.now(clock));
+            r.setDecisionNote(AUTO_NOTE);
+            audit.log(null, r.getId(), "AUTO_APPROVED", AUTO_NOTE);
+        } else {
+            notifier.created(r);
+        }
         return r;
     }
 
@@ -178,9 +187,15 @@ public class RequestService {
         if (!Objects.equals(r.getUser().getId(), actor.getId())) throw ApiException.forbidden();
         if (r.getStatus() != RequestStatus.APPROVED) throw ApiException.conflict("Si possono annullare solo richieste approvate");
         if (r.getEndDate().isBefore(LocalDate.now(clock))) throw ApiException.conflict("Il periodo e' gia' trascorso");
-        r.setStatus(RequestStatus.CANCEL_REQUESTED);
         audit.log(actor.getId(), r.getId(), "CANCEL_REQUESTED", note);
-        notifier.cancelRequested(r);
+        if (notifier.approversOf(r.getUser()).isEmpty()) {
+            r.setStatus(RequestStatus.CANCELLED);
+            r.setDecidedAt(Instant.now(clock));
+            audit.log(null, r.getId(), "AUTO_CANCELLED", AUTO_NOTE);
+        } else {
+            r.setStatus(RequestStatus.CANCEL_REQUESTED);
+            notifier.cancelRequested(r);
+        }
         return r;
     }
 

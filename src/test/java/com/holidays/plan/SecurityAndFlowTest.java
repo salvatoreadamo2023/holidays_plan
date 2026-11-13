@@ -336,4 +336,21 @@ class SecurityAndFlowTest {
         int again = reminder.run();
         assertThat(again).isZero();
     }
+
+    @Test
+    void unicoAdmin_richiestaApprovataInAutomatico_eAnnullamentoDiretto() throws Exception {
+        // Nei dati demo c'e' un solo Admin: nessuno sopra di lui puo' decidere.
+        String admin = token("admin");
+        LocalDate d = freshMonday();
+        String body = mvc.perform(post("/api/requests").header("Authorization", admin).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", d.toString(), "endDate", d.toString()))))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("APPROVED")).andReturn().getResponse().getContentAsString();
+        long id = json.readTree(body).get("id").asLong();
+        mvc.perform(post("/api/requests/" + id + "/cancel").header("Authorization", admin))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        // Un utente normale invece resta in attesa del responsabile
+        mvc.perform(post("/api/requests").header("Authorization", token("andrea")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "FERIE", "startDate", freshMonday().toString(), "endDate", freshMonday().minusWeeks(1).plusDays(1).toString()))))
+            .andExpect(jsonPath("$.status").value("PENDING"));
+    }
 }
