@@ -25,6 +25,11 @@ public class AbsenceRequest {
     @Column(nullable = false, length = 20)
     private AbsenceType type;
 
+    /** Solo per GENERAL_LEAVE. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "leave_reason", length = 30)
+    private LeaveReason leaveReason;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private RequestStatus status = RequestStatus.PENDING;
@@ -41,7 +46,7 @@ public class AbsenceRequest {
     @Column(precision = 4, scale = 1)
     private BigDecimal hours;
 
-    /** Giorni lavorativi (FERIE/MALATTIA) oppure ore (PERMESSO). */
+    /** Giorni lavorativi oppure ore (PERMESSO). */
     @Column(nullable = false, precision = 6, scale = 1)
     private BigDecimal amount;
 

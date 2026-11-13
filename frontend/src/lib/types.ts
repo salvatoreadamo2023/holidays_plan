@@ -1,5 +1,6 @@
 export type Role = 'USER' | 'TEAM_LEAD' | 'PROJECT_MANAGER' | 'ADMIN'
-export type AbsenceType = 'FERIE' | 'PERMESSO' | 'MALATTIA'
+export type AbsenceType = 'FERIE' | 'PERMESSO' | 'GENERAL_LEAVE' | 'CLIENT_OFFICE' | 'BUSINESS_TRIP'
+export type LeaveReason = 'MALATTIA' | 'MALATTIA_FIGLIO' | 'VISITA_MEDICA' | 'LEGGE_104' | 'MATERNITA_PATERNITA' | 'CONGEDO_PARENTALE' | 'CONGEDO_MATRIMONIALE' | 'LUTTO' | 'DONAZIONE_SANGUE' | 'SEGGIO_ELETTORALE' | 'STUDIO_ESAMI' | 'ALTRO'
 export type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN' | 'CANCEL_REQUESTED' | 'CANCELLED'
 
 export interface UserSummary {
@@ -9,7 +10,7 @@ export interface UserSummary {
 }
 
 export interface RequestView {
-  id: number; user: UserSummary; type: AbsenceType; status: Status
+  id: number; user: UserSummary; type: AbsenceType; leaveReason: LeaveReason | null; status: Status
   startDate: string; endDate: string; halfDay: boolean; hours: number | null; amount: number
   note: string | null; decisionNote: string | null; decidedBy: string | null; decidedAt: string | null; createdAt: string
   attachments: AttachmentInfo[]
@@ -21,7 +22,7 @@ export interface Trend {
   year: number
   leaveDays: number; leavePending: number
   permitHours: number; permitPending: number
-  sickDays: number; absenceDays: number
+  sickDays: number; absenceDays: number; awayDays: number
 }
 
 export interface Balance {
@@ -39,7 +40,7 @@ export interface CalendarView {
   from: string; to: string
   days: { date: string; weekend: boolean; holiday: string | null }[]
   people: { id: number; fullName: string; role: Role; teamId: number | null; teamName: string | null }[]
-  entries: { requestId: number | null; userId: number; startDate: string; endDate: string; type: AbsenceType | 'ASSENZA'; status: Status; halfDay: boolean; hours: number | null }[]
+  entries: { requestId: number | null; userId: number; startDate: string; endDate: string; type: AbsenceType | 'ASSENZA'; status: Status; halfDay: boolean; hours: number | null; reason: string | null }[]
   areas: { id: number; name: string }[]
   teams: { id: number; name: string }[]
   areaId: number | null; teamId: number | null
@@ -47,7 +48,7 @@ export interface CalendarView {
 
 export interface Preview { amount: number; unit: string; availableAfter: number | null; colleaguesAbsent: string[]; warnings: string[] }
 
-export interface CreateRequest { type: AbsenceType; startDate: string; endDate: string; halfDay?: boolean; hours: number | null; note: string; forUserId?: number | null }
+export interface CreateRequest { type: AbsenceType; startDate: string; endDate: string; halfDay?: boolean; hours: number | null; note: string; forUserId?: number | null; leaveReason?: LeaveReason | null }
 
 export interface UserAdmin {
   id: number; username: string; email: string; fullName: string; role: Role

@@ -156,7 +156,7 @@ export function CalendarPage() {
                         {entries.map((e, ei) => {
                           const s = Math.max(0, dayIndex(e.startDate) === -1 ? 0 : dayIndex(e.startDate))
                           const en = dayIndex(e.endDate) === -1 ? nDays - 1 : dayIndex(e.endDate)
-                          const label = `${typeLabel[e.type]}${e.halfDay ? ' · ½' : ''}${e.hours ? ` · ${e.hours}h` : ''}`
+                          const label = `${typeLabel[e.type]}${e.reason ? ` · ${e.reason}` : ''}${e.halfDay ? ' · ½' : ''}${e.hours ? ` · ${e.hours}h` : ''}`
                           const short = en - s < 1
                           return (
                             <motion.div key={ei}
@@ -181,7 +181,7 @@ export function CalendarPage() {
       </Card>
 
       <div className="flex flex-wrap items-center gap-5 text-sm text-muted">
-        {(['FERIE', 'PERMESSO', 'MALATTIA', 'ASSENZA'] as const).map(t => (
+        {(['FERIE', 'PERMESSO', 'GENERAL_LEAVE', 'CLIENT_OFFICE', 'BUSINESS_TRIP', 'ASSENZA'] as const).map(t => (
           <span key={t} className="flex items-center gap-2"><span className={clsx('h-3 w-6 rounded', `bar-${t}`)} /> {typeLabel[t]}</span>
         ))}
         <span className="flex items-center gap-2"><span className="bar-FERIE bar-pending h-3 w-6 rounded" /> In attesa</span>

@@ -84,12 +84,13 @@ public class ExportService {
 
         Map<Long, BigDecimal[]> sums = new HashMap<>();
         for (AbsenceRequest r : list) {
-            BigDecimal[] s = sums.computeIfAbsent(r.getUser().getId(), k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
+            BigDecimal[] s = sums.computeIfAbsent(r.getUser().getId(), k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
             BigDecimal a = amountInMonth(r, from, to);
             switch (r.getType()) {
                 case FERIE -> s[0] = s[0].add(a);
                 case PERMESSO -> s[1] = s[1].add(a);
-                case MALATTIA -> s[2] = s[2].add(a);
+                case GENERAL_LEAVE -> s[2] = s[2].add(a);
+                case CLIENT_OFFICE, BUSINESS_TRIP -> s[3] = s[3].add(a);
             }
         }
 
@@ -100,11 +101,11 @@ public class ExportService {
             Worksheet sum = wb.newWorksheet("Riepilogo");
             sum.value(0, 0, "Assenze approvate - " + month);
             sum.style(0, 0).bold().fontSize(13).set();
-            String[] h = {"Persona", "Area", "Team", "Ferie (giorni)", "Permessi (ore)", "Malattia (giorni)", "Totale assenza (giorni)"};
+            String[] h = {"Persona", "Area", "Team", "Ferie (giorni)", "Permessi (ore)", "General leave (giorni)", "Totale assenza (giorni)", "CO / BT (giorni)"};
             header(sum, 2, h);
             int row = 3;
             for (User u : people.values().stream().sorted(Comparator.comparing(User::getFullName)).toList()) {
-                BigDecimal[] s = sums.getOrDefault(u.getId(), new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
+                BigDecimal[] s = sums.getOrDefault(u.getId(), new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
                 sum.value(row, 0, u.getFullName());
                 sum.value(row, 1, u.getArea() == null ? "" : u.getArea().getName());
                 sum.value(row, 2, u.getTeam() == null ? "" : u.getTeam().getName());
@@ -112,12 +113,13 @@ public class ExportService {
                 sum.value(row, 4, s[1]);
                 sum.value(row, 5, s[2]);
                 sum.value(row, 6, s[0].add(s[2]).add(s[1].divide(EIGHT, 1, RoundingMode.HALF_UP)));
+                sum.value(row, 7, s[3]);
                 row++;
             }
-            widths(sum, 28, 20, 24, 15, 15, 17, 22);
+            widths(sum, 28, 20, 24, 15, 15, 20, 22, 16);
 
             Worksheet det = wb.newWorksheet("Dettaglio");
-            header(det, 0, new String[]{"Persona", "Area", "Team", "Tipo", "Dal", "Al", "Mezza giornata", "Quantità nel mese", "Unità", "Allegati", "Approvata da"});
+            header(det, 0, new String[]{"Persona", "Area", "Team", "Tipo", "Dal", "Al", "Tipologia", "Quantità nel mese", "Unità", "Allegati", "Approvata da"});
             row = 1;
             for (AbsenceRequest r : list) {
                 User u = r.getUser();
@@ -129,14 +131,14 @@ public class ExportService {
                 det.style(row, 4).format("dd/mm/yyyy").set();
                 det.value(row, 5, r.getEndDate());
                 det.style(row, 5).format("dd/mm/yyyy").set();
-                det.value(row, 6, r.isHalfDay() ? "sì" : "");
+                det.value(row, 6, r.getLeaveReason() == null ? (r.isHalfDay() ? "mezza giornata" : "") : r.getLeaveReason().label);
                 det.value(row, 7, amountInMonth(r, from, to));
                 det.value(row, 8, r.getType() == AbsenceType.PERMESSO ? "ore" : "giorni");
                 det.value(row, 9, attCount.getOrDefault(r.getId(), 0L));
                 det.value(row, 10, r.getDecidedBy() == null ? "" : r.getDecidedBy().getFullName());
                 row++;
             }
-            widths(det, 28, 20, 24, 12, 12, 12, 15, 18, 9, 10, 24);
+            widths(det, 28, 20, 24, 18, 12, 12, 20, 18, 9, 10, 24);
             wb.finish();
             return out.toByteArray();
         } catch (IOException e) {

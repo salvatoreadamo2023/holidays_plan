@@ -65,6 +65,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         r.setAmount(amount);
         r.setStatus(st);
         if (t == AbsenceType.PERMESSO) r.setHours(amount);
+        if (t == AbsenceType.GENERAL_LEAVE) r.setLeaveReason(com.holidays.plan.domain.LeaveReason.MALATTIA);
         if (st != RequestStatus.PENDING && decider != null) {
             r.setDecidedBy(decider);
             r.setDecidedAt(Instant.now());
@@ -108,7 +109,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         LocalDate mon = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
         req(u2, AbsenceType.FERIE, mon, mon.plusDays(4), new BigDecimal("5"), RequestStatus.APPROVED, tl);
         req(u3, AbsenceType.FERIE, mon.plusDays(2), mon.plusDays(3), new BigDecimal("2"), RequestStatus.APPROVED, tl2);
-        req(u4, AbsenceType.MALATTIA, LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),
+        req(u4, AbsenceType.GENERAL_LEAVE, LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)),
             LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusDays(1),
             new BigDecimal("2"), RequestStatus.APPROVED, pm);
         req(u1, AbsenceType.FERIE, mon.plusDays(14), mon.plusDays(18), new BigDecimal("5"), RequestStatus.PENDING, null);

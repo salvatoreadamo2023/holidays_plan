@@ -69,7 +69,7 @@ export function Dashboard() {
                 {[
                   { label: 'Ferie', value: d.trend.leaveDays, unit: 'giorni', pending: d.trend.leavePending, icon: <Plane size={18} />, cls: 'from-violet-500 to-indigo-500' },
                   { label: 'Permessi', value: d.trend.permitHours, unit: 'ore', pending: d.trend.permitPending, icon: <Clock size={18} />, cls: 'from-amber-500 to-rose-500' },
-                  { label: 'Malattia', value: d.trend.sickDays, unit: 'giorni', pending: 0, icon: <Thermometer size={18} />, cls: 'from-rose-500 to-pink-500' },
+                  { label: 'General leave', value: d.trend.sickDays, unit: 'giorni', pending: 0, icon: <Thermometer size={18} />, cls: 'from-rose-500 to-pink-500' },
                   { label: 'Assente', value: d.trend.absenceDays, unit: 'giorni in tutto', pending: 0, icon: <CalendarOff size={18} />, cls: 'from-cyan-500 to-sky-600' },
                 ].map(t => (
                   <div key={t.label} className="rounded-2xl border border-soft p-4">
@@ -82,7 +82,7 @@ export function Dashboard() {
                 ))}
               </div>
             )}
-            <p className="mt-4 text-xs text-muted">Conteggi dalle richieste approvate dell'anno. "Assente" somma ferie, malattia e permessi (8 ore = 1 giorno).</p>
+            <p className="mt-4 text-xs text-muted">Conteggi dalle richieste approvate dell'anno. "Assente" somma ferie, general leave e permessi (8 ore = 1 giorno). CO e trasferte non contano.</p>
           </Card>
         </motion.div>
 

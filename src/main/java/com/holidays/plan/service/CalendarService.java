@@ -55,11 +55,13 @@ public class CalendarService {
             User u = r.getUser();
             if (!ids.contains(u.getId())) continue;
             boolean details = policy.canSeeDetails(actor, u);
-            // Chi non ha visibilita' completa vede solo assenze confermate, senza tipo.
+            // Chi non ha visibilita' completa vede solo assenze confermate, senza tipo; CO e BT li vedono tutti.
             if (!details && r.getStatus() == RequestStatus.PENDING) continue;
+            boolean showType = details || r.getType().isPresence();
             entries.add(new Entry(details ? r.getId() : null, u.getId(), r.getStartDate(), r.getEndDate(),
-                details ? r.getType().name() : "ASSENZA", r.getStatus().name(), r.isHalfDay(),
-                details ? r.getHours() : null));
+                showType ? r.getType().name() : "ASSENZA", r.getStatus().name(), r.isHalfDay(),
+                details ? r.getHours() : null,
+                details && r.getLeaveReason() != null ? r.getLeaveReason().label : null));
         }
 
         List<Option> areaOptions = admin
@@ -79,6 +81,7 @@ public class CalendarService {
         LocalDate today = LocalDate.now(com.holidays.plan.config.ClockConfig.ZONE);
         boolean admin = actor.getRole() == Role.ADMIN;
         return requests.findOverlapping(today, today, RequestStatus.ACTIVE).stream()
+            .filter(r -> !r.getType().isPresence())
             .map(AbsenceRequest::getUser)
             .filter(u -> admin || (actor.areaId() != null && actor.areaId().equals(u.areaId())))
             .map(User::getFullName).distinct().sorted().toList();

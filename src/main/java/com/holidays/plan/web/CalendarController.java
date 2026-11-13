@@ -61,11 +61,11 @@ public class CalendarController {
         CalendarView v = calendar.view(currentUser.get(), from, to, areaId, teamId);
         Map<Long, CalendarView.Person> people = v.people().stream()
             .collect(Collectors.toMap(CalendarView.Person::id, Function.identity()));
-        StringBuilder sb = new StringBuilder("﻿Persona;Team;Tipo;Stato;Dal;Al;Mezza giornata;Ore\n");
+        StringBuilder sb = new StringBuilder("﻿Persona;Team;Tipo;Tipologia;Stato;Dal;Al;Mezza giornata;Ore\n");
         for (CalendarView.Entry e : v.entries()) {
             CalendarView.Person p = people.get(e.userId());
             sb.append(csv(p.fullName())).append(';').append(csv(p.teamName())).append(';')
-                .append(e.type()).append(';').append(e.status()).append(';')
+                .append(e.type()).append(';').append(csv(e.reason())).append(';').append(e.status()).append(';')
                 .append(e.startDate()).append(';').append(e.endDate()).append(';')
                 .append(e.halfDay() ? "si" : "").append(';')
                 .append(e.hours() == null ? "" : e.hours().toPlainString()).append('\n');

@@ -37,8 +37,15 @@ public class Notifier {
         return switch (t) {
             case FERIE -> "Ferie";
             case PERMESSO -> "Permesso";
-            case MALATTIA -> "Malattia";
+            case GENERAL_LEAVE -> "General leave";
+            case CLIENT_OFFICE -> "Presso cliente (CO)";
+            case BUSINESS_TRIP -> "Trasferta (BT)";
         };
+    }
+
+    /** Etichetta con la tipologia (solo per chi puo' vederla: interessato, responsabili, admin). */
+    static String label(AbsenceRequest r) {
+        return r.getLeaveReason() != null ? label(r.getType()) + " · " + r.getLeaveReason().label : label(r.getType());
     }
 
     static String what(AbsenceRequest r) {
@@ -46,7 +53,7 @@ public class Notifier {
             + (r.getType() == AbsenceType.PERMESSO ? " h" : (r.getAmount().compareTo(BigDecimal.ONE) == 0 ? " giorno" : " giorni"));
         String when = r.getStartDate().equals(r.getEndDate()) ? D.format(r.getStartDate())
             : D.format(r.getStartDate()) + " - " + D.format(r.getEndDate());
-        return label(r.getType()) + " " + amount + ", " + when;
+        return label(r) + " " + amount + ", " + when;
     }
 
     private static Map<String, Object> data(AbsenceRequest r, String screen) {
@@ -71,8 +78,8 @@ public class Notifier {
             what(r), data(r, "Richieste"));
     }
 
-    public void sickRecorded(AbsenceRequest r) {
-        push.notify(approversOf(r.getUser()), r.getUser().getFullName() + " in malattia", what(r), data(r, "Calendario"));
+    public void leaveRecorded(AbsenceRequest r) {
+        push.notify(approversOf(r.getUser()), r.getUser().getFullName() + " assente", what(r), data(r, "Calendario"));
     }
 
     public void insertedForYou(AbsenceRequest r, User by) {
@@ -81,9 +88,9 @@ public class Notifier {
 
     public void certificateMissing(AbsenceRequest r) {
         push.notify(List.of(r.getUser().getId()), "Manca il certificato",
-            "Allega il certificato alla malattia del " + D.format(r.getStartDate()) + ".", data(r, "Richieste"));
+            "Allega il certificato all'assenza del " + D.format(r.getStartDate()) + ".", data(r, "Richieste"));
         List<Long> managers = approversOf(r.getUser()).stream().filter(id -> !Objects.equals(id, r.getUser().getId())).toList();
         push.notify(managers, "Certificato mancante",
-            r.getUser().getFullName() + ": malattia del " + D.format(r.getStartDate()) + " ancora senza certificato.", data(r, "Approvazioni"));
+            r.getUser().getFullName() + ": assenza del " + D.format(r.getStartDate()) + " ancora senza certificato.", data(r, "Approvazioni"));
     }
 }

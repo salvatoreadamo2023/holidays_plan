@@ -24,7 +24,7 @@ public class RequestService {
     static final int SICK_BACKDATE_DAYS = 30;
     static final int ON_BEHALF_BACKDATE_DAYS = 366;
     static final String AUTO_NOTE = "Approvata automaticamente: nessun responsabile disponibile";
-    static final String SICK_NOTE = "Malattia registrata";
+    static final String RECORDED_NOTE = "Registrata";
 
     private final AbsenceRequestRepository requests;
     private final UserRepository users;
@@ -47,6 +47,10 @@ public class RequestService {
 
     private record Computed(BigDecimal amount, String unit) {}
 
+    private static void requireReason(CreateRequest in) {
+        if (in.type() == AbsenceType.GENERAL_LEAVE && in.leaveReason() == null) throw ApiException.bad("Scegli la tipologia");
+    }
+
     private Computed validateAndCompute(User user, CreateRequest in, boolean onBehalf) {
         LocalDate today = LocalDate.now(clock);
         if (in.halfDay()) throw ApiException.bad("La mezza giornata non e' piu' prevista: usa il permesso a ore");
@@ -56,9 +60,9 @@ public class RequestService {
         if (onBehalf) {
             if (in.startDate().isBefore(today.minusDays(ON_BEHALF_BACKDATE_DAYS)))
                 throw ApiException.bad("Si puo' inserire un'assenza al massimo un anno indietro");
-        } else if (in.type() == AbsenceType.MALATTIA) {
+        } else if (in.type().isAutoRecorded()) {
             if (in.startDate().isBefore(today.minusDays(SICK_BACKDATE_DAYS)))
-                throw ApiException.bad("La malattia si puo' registrare al massimo " + SICK_BACKDATE_DAYS + " giorni indietro");
+                throw ApiException.bad("Si puo' registrare al massimo " + SICK_BACKDATE_DAYS + " giorni indietro");
         } else if (in.startDate().isBefore(today)) {
             throw ApiException.bad("Non si possono chiedere ferie o permessi nel passato");
         }
@@ -74,7 +78,7 @@ public class RequestService {
                 if (!calendar.isWorkingDay(in.startDate())) throw ApiException.bad("Il giorno scelto non e' lavorativo");
                 return new Computed(in.hours(), "ore");
             }
-            case FERIE, MALATTIA -> {
+            case FERIE, GENERAL_LEAVE, CLIENT_OFFICE, BUSINESS_TRIP -> {
                 BigDecimal days = calendar.workingDays(in.startDate(), in.endDate());
                 if (days.signum() == 0) throw ApiException.bad("Nel periodo scelto non ci sono giorni lavorativi");
                 return new Computed(days, "giorni");
@@ -98,6 +102,7 @@ public class RequestService {
     private List<String> colleaguesAbsent(User user, LocalDate from, LocalDate to) {
         if (user.areaId() == null) return List.of();
         return requests.findOverlapping(from, to, RequestStatus.ACTIVE).stream()
+            .filter(r -> !r.getType().isPresence())
             .map(AbsenceRequest::getUser)
             .filter(u -> !Objects.equals(u.getId(), user.getId()) && Objects.equals(u.areaId(), user.areaId()))
             .map(User::getFullName).distinct().sorted().toList();
@@ -108,9 +113,10 @@ public class RequestService {
         User user = subject(actor, in);
         if (user != actor) return createOnBehalf(actor, user, in);
         Computed c = validateAndCompute(user, in, false);
+        requireReason(in);
         if (requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING))
             throw ApiException.conflict("Hai gia' una richiesta che si sovrappone a queste date");
-        long pending = requests.findByUser(user.getId()).stream()
+        long pending = in.type().isAutoRecorded() ? 0 : requests.findByUser(user.getId()).stream()
             .filter(r -> r.getStatus() == RequestStatus.PENDING).count();
         if (pending >= MAX_PENDING)
             throw ApiException.conflict("Hai gia' " + MAX_PENDING + " richieste in attesa");
@@ -123,17 +129,18 @@ public class RequestService {
         r.setEndDate(in.endDate());
         r.setHalfDay(false);
         r.setHours(in.type() == AbsenceType.PERMESSO ? in.hours() : null);
+        r.setLeaveReason(in.type() == AbsenceType.GENERAL_LEAVE ? in.leaveReason() : null);
         r.setAmount(c.amount());
         r.setNote(blankToNull(in.note()));
         r = requests.save(r);
         audit.log(user.getId(), r.getId(), "CREATED", in.type() + " " + in.startDate() + " -> " + in.endDate());
-        if (in.type() == AbsenceType.MALATTIA) {
-            // La malattia non si chiede, si comunica: registrata subito, i responsabili vengono avvisati.
+        if (in.type().isAutoRecorded()) {
+            // General leave, CO e BT non si chiedono, si comunicano: registrati subito.
             r.setStatus(RequestStatus.APPROVED);
             r.setDecidedAt(Instant.now(clock));
-            r.setDecisionNote(SICK_NOTE);
-            audit.log(null, r.getId(), "SICK_RECORDED", SICK_NOTE);
-            notifier.sickRecorded(r);
+            r.setDecisionNote(RECORDED_NOTE);
+            audit.log(null, r.getId(), "RECORDED", Notifier.label(r));
+            if (in.type() == AbsenceType.GENERAL_LEAVE) notifier.leaveRecorded(r);
         } else if (notifier.approversOf(user).isEmpty()) {
             // Nessuno puo' decidere (es. unico Admin): approvazione automatica, tracciata nello storico.
             r.setStatus(RequestStatus.APPROVED);
@@ -160,6 +167,7 @@ public class RequestService {
 
     private AbsenceRequest createOnBehalf(User actor, User user, CreateRequest in) {
         Computed c = validateAndCompute(user, in, true);
+        requireReason(in);
         if (requests.existsOverlapForUser(user.getId(), in.startDate(), in.endDate(), RequestStatus.BLOCKING))
             throw ApiException.conflict(user.getFullName() + " ha gia' un'assenza che si sovrappone a queste date");
         AbsenceRequest r = new AbsenceRequest();
@@ -170,6 +178,7 @@ public class RequestService {
         r.setEndDate(in.endDate());
         r.setHalfDay(false);
         r.setHours(in.type() == AbsenceType.PERMESSO ? in.hours() : null);
+        r.setLeaveReason(in.type() == AbsenceType.GENERAL_LEAVE ? in.leaveReason() : null);
         r.setAmount(c.amount());
         r.setNote(blankToNull(in.note()));
         r.setDecidedBy(actor);
@@ -244,6 +253,13 @@ public class RequestService {
         if (!Objects.equals(r.getUser().getId(), actor.getId())) throw ApiException.forbidden();
         if (r.getStatus() != RequestStatus.APPROVED) throw ApiException.conflict("Si possono annullare solo richieste approvate");
         if (r.getEndDate().isBefore(LocalDate.now(clock))) throw ApiException.conflict("Il periodo e' gia' trascorso");
+        if (r.getType().isPresence()) {
+            // CO e BT si tolgono in autonomia, come si mettono.
+            r.setStatus(RequestStatus.CANCELLED);
+            r.setDecidedAt(Instant.now(clock));
+            audit.log(actor.getId(), r.getId(), "CANCELLED", "Tolta dall'interessato");
+            return r;
+        }
         audit.log(actor.getId(), r.getId(), "CANCEL_REQUESTED", note);
         if (notifier.approversOf(r.getUser()).isEmpty()) {
             r.setStatus(RequestStatus.CANCELLED);

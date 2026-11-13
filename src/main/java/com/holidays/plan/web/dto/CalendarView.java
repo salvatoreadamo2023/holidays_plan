@@ -13,7 +13,7 @@ public record CalendarView(LocalDate from, LocalDate to, List<Day> days, List<Pe
 
     /** type e' "ASSENZA" quando chi guarda non puo' vedere il dettaglio. */
     public record Entry(Long requestId, Long userId, LocalDate startDate, LocalDate endDate, String type,
-                        String status, boolean halfDay, BigDecimal hours) {}
+                        String status, boolean halfDay, BigDecimal hours, String reason) {}
 
     public record Option(Long id, String name) {}
 }

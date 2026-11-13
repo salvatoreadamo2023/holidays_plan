@@ -48,7 +48,7 @@ public class BalanceService {
         BigDecimal leavePending = sum(u, AbsenceType.FERIE, pending, year);
         BigDecimal permitUsed = sum(u, AbsenceType.PERMESSO, active, year);
         BigDecimal permitPending = sum(u, AbsenceType.PERMESSO, pending, year);
-        BigDecimal sick = sum(u, AbsenceType.MALATTIA, active, year);
+        BigDecimal sick = sum(u, AbsenceType.GENERAL_LEAVE, active, year);
         return new BalanceView(year,
             u.getAnnualLeaveDays(), leaveUsed, leavePending,
             u.getAnnualLeaveDays().subtract(leaveUsed).subtract(leavePending),
@@ -73,8 +73,9 @@ public class BalanceService {
             int i = r.getType().ordinal();
             target[i] = target[i].add(amountIn(r, from, to));
         }
-        int f = AbsenceType.FERIE.ordinal(), p = AbsenceType.PERMESSO.ordinal(), m = AbsenceType.MALATTIA.ordinal();
+        int f = AbsenceType.FERIE.ordinal(), p = AbsenceType.PERMESSO.ordinal(), m = AbsenceType.GENERAL_LEAVE.ordinal();
+        BigDecimal away = ok[AbsenceType.CLIENT_OFFICE.ordinal()].add(ok[AbsenceType.BUSINESS_TRIP.ordinal()]);
         BigDecimal total = ok[f].add(ok[m]).add(ok[p].divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP));
-        return new TrendView(year, ok[f], wait[f], ok[p], wait[p], ok[m], total);
+        return new TrendView(year, ok[f], wait[f], ok[p], wait[p], ok[m], total, away);
     }
 }

@@ -5,13 +5,14 @@ import { AlertTriangle, CalendarDays, Sparkles, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import clsx from 'clsx'
 import { api } from '../lib/api'
-import { iso, num, typeEmoji, typeLabel } from '../lib/format'
-import type { AbsenceType, CreateRequest, Preview, UserSummary } from '../lib/types'
+import { isAutoRecorded, isPresence, iso, num, reasonLabel, typeEmoji, typeShort } from '../lib/format'
+import type { AbsenceType, CreateRequest, LeaveReason, Preview, UserSummary } from '../lib/types'
 import { useUi } from '../lib/ui'
 import { Avatar, Button, Field, inputCls, Modal } from './ui'
 import { ACCEPT, MAX_MB, uploadAttachment } from './Attachments'
 
-const types: AbsenceType[] = ['FERIE', 'PERMESSO', 'MALATTIA']
+const types: AbsenceType[] = ['FERIE', 'PERMESSO', 'GENERAL_LEAVE', 'CLIENT_OFFICE', 'BUSINESS_TRIP']
+const reasons = Object.keys(reasonLabel) as LeaveReason[]
 
 function useDebounced<T>(v: T, ms = 350) {
   const [d, setD] = useState(v)
@@ -23,7 +24,7 @@ export function NewRequestDrawer() {
   const { requestOpen, closeRequest, draft } = useUi()
   const qc = useQueryClient()
   const today = iso(new Date())
-  const [form, setForm] = useState<CreateRequest>({ type: 'FERIE', startDate: today, endDate: today, hours: 2, note: '', forUserId: null })
+  const [form, setForm] = useState<CreateRequest>({ type: 'FERIE', startDate: today, endDate: today, hours: 2, note: '', forUserId: null, leaveReason: null })
 
   useEffect(() => {
     if (requestOpen) setForm(f => ({ ...f, startDate: draft.startDate ?? today, endDate: draft.endDate ?? draft.startDate ?? today, note: '' }))
@@ -42,6 +43,7 @@ export function NewRequestDrawer() {
     endDate: single ? form.startDate : form.endDate,
     hours: form.type === 'PERMESSO' ? form.hours : null,
     forUserId: form.forUserId || null,
+    leaveReason: form.type === 'GENERAL_LEAVE' ? form.leaveReason : null,
   }
   const debounced = useDebounced(payload)
   const preview = useQuery({
@@ -65,7 +67,8 @@ export function NewRequestDrawer() {
     onSuccess: () => {
       const who = people.data?.find(u => u.id === payload.forUserId)?.fullName
       if (who) toast.success('Assenza inserita', { description: `Registrata per ${who}, già approvata.` })
-      else if (payload.type === 'MALATTIA') toast.success('Malattia registrata', { description: 'I responsabili sono stati avvisati.' })
+      else if (payload.type === 'GENERAL_LEAVE') toast.success('Assenza registrata', { description: 'I responsabili sono stati avvisati.' })
+      else if (isPresence(payload.type)) toast.success('Registrato', { description: 'Visibile a tutti nel calendario.' })
       else toast.success('Richiesta inviata', { description: 'Il tuo responsabile riceverà la notifica.' })
       qc.invalidateQueries(); closeRequest()
     },
@@ -87,7 +90,7 @@ export function NewRequestDrawer() {
             </select>
           </Field>
         )}
-        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Tipo di assenza">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Tipo di assenza">
           {types.map(t => (
             <button
               key={t} role="radio" aria-checked={form.type === t}
@@ -97,7 +100,7 @@ export function NewRequestDrawer() {
             >
               {form.type === t && <motion.span layoutId="type-pill" className={clsx('absolute inset-0 rounded-2xl', `bar-${t}`)} transition={{ type: 'spring', damping: 26, stiffness: 300 }} />}
               <span className="relative text-2xl">{typeEmoji[t]}</span>
-              <span className="relative">{typeLabel[t]}</span>
+              <span className="relative text-center text-xs leading-tight sm:text-sm">{typeShort[t]}</span>
             </button>
           ))}
         </div>
@@ -114,6 +117,18 @@ export function NewRequestDrawer() {
           )}
         </div>
 
+        {form.type === 'GENERAL_LEAVE' && (
+          <Field label="Tipologia" hint="La vedono solo i tuoi responsabili e l'admin: ai colleghi compare solo «Assente».">
+            <select className={inputCls} value={form.leaveReason ?? ''} onChange={e => set('leaveReason', (e.target.value || null) as LeaveReason | null)}>
+              <option value="">Scegli…</option>
+              {reasons.map(r => <option key={r} value={r}>{reasonLabel[r]}</option>)}
+            </select>
+          </Field>
+        )}
+        {isPresence(form.type) && (
+          <p className="rounded-2xl bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">Non è un'assenza: viene registrato subito, senza approvazione, ed è visibile a tutti nel calendario.</p>
+        )}
+
         {form.type === 'PERMESSO' && (
           <Field label={`Ore di permesso: ${num(form.hours)}`}>
             <input type="range" min={0.5} max={8} step={0.5} value={form.hours ?? 1}
@@ -123,7 +138,7 @@ export function NewRequestDrawer() {
 
         <Field label="Note (facoltative)">
           <textarea className={clsx(inputCls, 'min-h-20 resize-none')} maxLength={500} value={form.note}
-            placeholder={form.type === 'MALATTIA' ? 'Numero protocollo certificato…' : 'Es. viaggio, visita medica…'}
+            placeholder={form.type === 'GENERAL_LEAVE' ? 'Es. numero protocollo certificato…' : isPresence(form.type) ? 'Es. cliente, città…' : 'Es. viaggio, visita medica…'}
             onChange={e => set('note', e.target.value)} />
         </Field>
 
@@ -163,9 +178,9 @@ export function NewRequestDrawer() {
           <input type="file" accept={ACCEPT} className={clsx(inputCls, 'py-2 text-sm')} onChange={e => setFile(e.target.files?.[0] ?? null)} />
         </Field>
 
-        <Button variant="primary" className="w-full py-3.5 text-base" disabled={create.isPending || !!err || !p || p.warnings.length > 0}
+        <Button variant="primary" className="w-full py-3.5 text-base" disabled={create.isPending || !!err || !p || p.warnings.length > 0 || (form.type === 'GENERAL_LEAVE' && !form.leaveReason)}
           onClick={() => create.mutate()}>
-          {create.isPending ? 'Invio…' : forOther ? 'Inserisci assenza' : form.type === 'MALATTIA' ? 'Registra malattia' : 'Invia richiesta'}
+          {create.isPending ? 'Invio…' : forOther ? 'Inserisci assenza' : isAutoRecorded(form.type) ? 'Registra' : 'Invia richiesta'}
         </Button>
       </div>
     </Modal>

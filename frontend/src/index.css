@@ -14,6 +14,10 @@
   --color-permesso-2: #f97316;
   --color-malattia: #f43f5e;
   --color-malattia-2: #ec4899;
+  --color-co: #10b981;
+  --color-co-2: #14b8a6;
+  --color-bt: #84cc16;
+  --color-bt-2: #22c55e;
   --color-assenza: #06b6d4;
   --color-assenza-2: #3b82f6;
 }
@@ -111,7 +115,9 @@ body {
 /* Barre del calendario */
 .bar-FERIE { background: linear-gradient(90deg, var(--color-ferie), var(--color-ferie-2)); }
 .bar-PERMESSO { background: linear-gradient(90deg, var(--color-permesso), var(--color-permesso-2)); }
-.bar-MALATTIA { background: linear-gradient(90deg, var(--color-malattia), var(--color-malattia-2)); }
+.bar-GENERAL_LEAVE { background: linear-gradient(90deg, var(--color-malattia), var(--color-malattia-2)); }
+.bar-CLIENT_OFFICE { background: linear-gradient(90deg, var(--color-co), var(--color-co-2)); }
+.bar-BUSINESS_TRIP { background: linear-gradient(90deg, var(--color-bt), var(--color-bt-2)); }
 .bar-ASSENZA { background: linear-gradient(90deg, var(--color-assenza), var(--color-assenza-2)); }
 .bar-pending {
   background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,.28) 0 6px, transparent 6px 12px) !important;

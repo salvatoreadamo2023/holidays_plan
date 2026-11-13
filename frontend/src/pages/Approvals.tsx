@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Keyboard, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
-import { num, range, roleLabel, typeLabel } from '../lib/format'
+import { needsCertificate, num, range, roleLabel, typeText } from '../lib/format'
 import type { RequestView } from '../lib/types'
 import { Avatar, Button, Card, Empty, Field, inputCls, Modal, StatusChip, TypeIcon } from '../components/ui'
 import { Attachments } from '../components/Attachments'
@@ -85,11 +85,11 @@ export function Approvals() {
                     <div className="mt-2 flex items-center gap-3">
                       <TypeIcon type={r.type} size={36} />
                       <div>
-                        <div className="font-semibold">{typeLabel[r.type]} · {num(r.amount)} {r.type === 'PERMESSO' ? 'ore' : 'giorni'}</div>
+                        <div className="font-semibold">{typeText(r)} · {num(r.amount)} {r.type === 'PERMESSO' ? 'ore' : 'giorni'}</div>
                         <div className="text-sm text-muted">{range(r)}</div>
                       </div>
                       {r.status === 'CANCEL_REQUESTED' && <StatusChip status={r.status} />}
-                      {r.type === 'MALATTIA' && !(r.attachments ?? []).length && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-300">Certificato mancante</span>}
+                      {needsCertificate(r) && !(r.attachments ?? []).length && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-300">Certificato mancante</span>}
                     </div>
                     {r.note && <p className="mt-3 rounded-xl bg-[var(--grid)] px-3 py-2 text-sm">“{r.note}”</p>}
                     <Attachments requestId={r.id} items={r.attachments ?? []} />

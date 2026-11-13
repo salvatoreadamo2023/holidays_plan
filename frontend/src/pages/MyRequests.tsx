@@ -5,7 +5,7 @@ import { Undo2, XCircle } from 'lucide-react'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
-import { fmt, num, range, typeLabel } from '../lib/format'
+import { fmt, isPresence, needsCertificate, num, range, typeText } from '../lib/format'
 import type { RequestView, Status } from '../lib/types'
 import { Button, Card, Empty, StatusChip, TypeIcon } from '../components/ui'
 import { Attachments } from '../components/Attachments'
@@ -52,10 +52,10 @@ export function MyRequests() {
                 <TypeIcon type={r.type} size={40} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{typeLabel[r.type]}</span>
+                    <span className="font-semibold">{typeText(r)}</span>
                     <span className="text-sm text-muted">· {num(r.amount)} {r.type === 'PERMESSO' ? 'ore' : 'giorni'}</span>
                     <StatusChip status={r.status} />
-                    {r.type === 'MALATTIA' && !(r.attachments ?? []).length && ['PENDING', 'APPROVED'].includes(r.status) && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-300">Certificato mancante</span>}
+                    {needsCertificate(r) && !(r.attachments ?? []).length && ['PENDING', 'APPROVED'].includes(r.status) && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-300">Certificato mancante</span>}
                   </div>
                   <div className="mt-0.5 text-sm">{range(r)}</div>
                   {r.note && <div className="mt-1 text-xs text-muted">“{r.note}”</div>}
@@ -68,7 +68,7 @@ export function MyRequests() {
                   <Attachments requestId={r.id} items={r.attachments ?? []} editable={r.status !== 'WITHDRAWN'} />
                 </div>
                 {r.status === 'PENDING' && <Button onClick={() => act.mutate({ id: r.id, action: 'withdraw' })}><Undo2 size={16} /> Ritira</Button>}
-                {r.status === 'APPROVED' && r.endDate >= today && <Button onClick={() => act.mutate({ id: r.id, action: 'cancel' })}><XCircle size={16} /> Annulla</Button>}
+                {r.status === 'APPROVED' && r.endDate >= today && <Button onClick={() => act.mutate({ id: r.id, action: 'cancel' })}><XCircle size={16} /> {isPresence(r.type) ? 'Togli' : 'Annulla'}</Button>}
               </Card>
             </motion.div>
           ))}

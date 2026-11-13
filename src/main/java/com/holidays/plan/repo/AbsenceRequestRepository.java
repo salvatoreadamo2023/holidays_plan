@@ -48,7 +48,9 @@ public interface AbsenceRequestRepository extends JpaRepository<AbsenceRequest, 
     /** Malattie ancora senza allegato, create prima di {@code before}, senza promemoria gia' inviato. */
     @Query("""
             select r from AbsenceRequest r join fetch r.user u left join fetch u.area
-            where r.type = com.holidays.plan.domain.AbsenceType.MALATTIA and r.status in :statuses
+            where r.type = com.holidays.plan.domain.AbsenceType.GENERAL_LEAVE
+              and r.leaveReason in (com.holidays.plan.domain.LeaveReason.MALATTIA, com.holidays.plan.domain.LeaveReason.MALATTIA_FIGLIO)
+              and r.status in :statuses
               and r.certificateReminderAt is null and r.createdAt < :before
               and not exists (select a.id from Attachment a where a.request = r)""")
     List<AbsenceRequest> sickWithoutCertificate(@Param("statuses") Collection<RequestStatus> statuses,

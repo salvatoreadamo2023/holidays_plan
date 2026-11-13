@@ -229,7 +229,7 @@ class SecurityAndFlowTest {
         mvc.perform(multipart("/api/requests/" + id + "/attachments")
                 .file(new MockMultipartFile("file", "x.pdf", "application/pdf", PDF))
                 .header("Authorization", token("pm2")))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isCreated()); // il PM responsabile puo' allegare (es. assenza inserita per conto)
 
         String url = json.readTree(mvc.perform(get("/api/attachments/" + attId + "/link").header("Authorization", token("pm2")))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("url").asText();
@@ -344,7 +344,7 @@ class SecurityAndFlowTest {
         LocalDate d = LocalDate.now().minusDays(3);
         while (d.getDayOfWeek().getValue() > 5) d = d.minusDays(1);
         mvc.perform(post("/api/requests").header("Authorization", token("sara")).contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(Map.of("type", "MALATTIA", "startDate", d.toString(), "endDate", d.toString()))))
+                .content(json.writeValueAsString(Map.of("type", "GENERAL_LEAVE", "leaveReason", "MALATTIA", "startDate", d.toString(), "endDate", d.toString()))))
             .andExpect(status().isCreated());
         assertThat(reminder.run()).isGreaterThanOrEqualTo(0);
         int again = reminder.run();
@@ -369,12 +369,16 @@ class SecurityAndFlowTest {
     }
 
     @Test
-    void malattiaRegistrataSubito_senzaApprovazione() throws Exception {
+    void generalLeaveRegistratoSubito_conTipologia_eVecchioNomeMalattia() throws Exception {
         LocalDate d = freshMonday();
         mvc.perform(post("/api/requests").header("Authorization", token("davide")).contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(Map.of("type", "MALATTIA", "startDate", d.toString(), "endDate", d.plusDays(1).toString()))))
+                .content(json.writeValueAsString(Map.of("type", "MALATTIA", "leaveReason", "LEGGE_104", "startDate", d.toString(), "endDate", d.plusDays(1).toString()))))
             .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("APPROVED"))
-            .andExpect(jsonPath("$.decisionNote").value("Malattia registrata"));
+            .andExpect(jsonPath("$.type").value("GENERAL_LEAVE")).andExpect(jsonPath("$.leaveReason").value("LEGGE_104"));
+        // Senza tipologia: rifiutata
+        mvc.perform(post("/api/requests").header("Authorization", token("davide")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "GENERAL_LEAVE", "startDate", d.plusWeeks(30).toString(), "endDate", d.plusWeeks(30).toString()))))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -447,5 +451,24 @@ class SecurityAndFlowTest {
                 .andReturn().getResponse().getContentAsString()))
             if (r.get("id").asLong() == id) return r.get("amount").decimalValue();
         throw new IllegalStateException();
+    }
+
+    @Test
+    void clientOfficeVisibileATutti_senzaApprovazione_eSiTogliDaSolo() throws Exception {
+        LocalDate d = freshMonday();
+        String body = mvc.perform(post("/api/requests").header("Authorization", token("sara")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("type", "CLIENT_OFFICE", "startDate", d.toString(), "endDate", d.plusDays(2).toString()))))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("APPROVED")).andReturn().getResponse().getContentAsString();
+        long id = json.readTree(body).get("id").asLong();
+        // Un collega (user, stesso team) vede il tipo CO, non "ASSENZA"
+        String cal = mvc.perform(get("/api/calendar").param("from", d.toString()).param("to", d.plusDays(4).toString())
+                .header("Authorization", token("user"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(cal).contains("CLIENT_OFFICE");
+        // Nessuna approvazione in coda
+        assertThat(mvc.perform(get("/api/requests/to-approve").header("Authorization", token("techlead")))
+            .andReturn().getResponse().getContentAsString()).doesNotContain("\"id\":" + id + ",");
+        // Si toglie senza chiedere
+        mvc.perform(post("/api/requests/" + id + "/cancel").header("Authorization", token("sara")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
     }
 }
