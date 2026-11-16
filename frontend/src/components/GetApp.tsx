@@ -15,8 +15,15 @@ export function IosSteps({ className }: { className?: string }) {
   )
 }
 
+/** Vero se il sito e' gia' aperto come app dalla schermata Home (iPhone o PWA installata). */
+const standalone = () => {
+  try { return (navigator as Navigator & { standalone?: boolean }).standalone === true || window.matchMedia('(display-mode: standalone)').matches } catch { return false }
+}
+
 /** Scheda in home: APK per Android (se l'admin ha messo il link) e passi per iPhone. */
 export function GetAppCard({ apkUrl, Card }: { apkUrl: string | null; Card: (p: { className?: string; children: React.ReactNode }) => React.ReactElement }) {
+  // Gia' installata sulla Home: la scheda non serve.
+  if (standalone()) return null
   return (
     <Card className="relative overflow-hidden">
       <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-500/20 blur-2xl" />
@@ -44,6 +51,7 @@ export function GetAppCard({ apkUrl, Card }: { apkUrl: string | null; Card: (p: 
 /** Nella pagina di accesso: link APK e passi per iPhone a scomparsa. */
 export function LoginAppLinks({ apkUrl }: { apkUrl: string | null | undefined }) {
   const [ios, setIos] = useState(false)
+  if (standalone()) return null
   return (
     <div className="mt-6 space-y-2">
       {apkUrl && (
