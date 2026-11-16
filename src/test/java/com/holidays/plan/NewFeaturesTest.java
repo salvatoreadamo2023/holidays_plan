@@ -76,7 +76,7 @@ class NewFeaturesTest {
                 .andExpect(jsonPath("$.apkUrl").value("https://expo.dev/artifacts/app.apk"));
         } finally {
             mvc.perform(put("/api/admin/settings").header("Authorization", admin).contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(Map.of("permitHours", List.of(0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8), "apkUrl", ""))))
+                .content(json.writeValueAsString(Map.of("permitHours", List.of(2, 4), "apkUrl", ""))))
                 .andExpect(status().isOk());
         }
     }

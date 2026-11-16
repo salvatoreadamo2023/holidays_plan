@@ -24,6 +24,9 @@ public class SettingsService {
         ALL_HOURS = List.copyOf(l);
     }
 
+    /** Predefinito aziendale: permessi da 2 o 4 ore. */
+    public static final List<BigDecimal> DEFAULT_HOURS = List.of(new BigDecimal("2"), new BigDecimal("4"));
+
     private final AppSettingRepository repo;
     private final AuditService audit;
     private final Clock clock;
@@ -94,12 +97,12 @@ public class SettingsService {
     }
 
     static List<BigDecimal> parseHours(String csv) {
-        if (csv == null || csv.isBlank()) return ALL_HOURS;
+        if (csv == null || csv.isBlank()) return DEFAULT_HOURS;
         List<BigDecimal> out = new ArrayList<>();
         for (String p : csv.split(",")) {
             try { out.add(new BigDecimal(p.trim()).stripTrailingZeros()); } catch (NumberFormatException ignored) { /* ignora */ }
         }
-        return out.isEmpty() ? ALL_HOURS : out;
+        return out.isEmpty() ? DEFAULT_HOURS : out;
     }
 
     private static String blankToNull(String s) {

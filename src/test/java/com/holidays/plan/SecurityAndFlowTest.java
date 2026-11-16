@@ -556,8 +556,8 @@ class SecurityAndFlowTest {
         // A cavallo di mese nell'anno dopo: gio 28 e ven 29 gen | lun 1 e mar 2 feb (date del 2027)
         LocalDate s = LocalDate.of(y + 1, 1, 28);
         onBehalf(admin, elena, Map.of("type", "GENERAL_LEAVE", "leaveReason", "LEGGE_104", "startDate", s.toString(), "endDate", s.plusDays(5).toString()));
-        // Permesso parziale di 3 ore e una giornata presso cliente
-        onBehalf(admin, elena, Map.of("type", "PERMESSO", "hours", 3, "startDate", (y + 1) + "-02-10", "endDate", (y + 1) + "-02-10"));
+        // Permesso parziale di 4 ore e una giornata presso cliente
+        onBehalf(admin, elena, Map.of("type", "PERMESSO", "hours", 4, "startDate", (y + 1) + "-02-10", "endDate", (y + 1) + "-02-10"));
         onBehalf(admin, elena, Map.of("type", "CLIENT_OFFICE", "startDate", (y + 1) + "-02-11", "endDate", (y + 1) + "-02-11"));
 
         JsonNode a1 = stats(admin, y), b1 = stats(admin, y + 1);
@@ -566,7 +566,7 @@ class SecurityAndFlowTest {
         assertThat(total(a1, "FERIE").subtract(total(a0, "FERIE"))).isEqualByComparingTo("3");
         assertThat(month(b1, "GENERAL_LEAVE", 1).subtract(month(b0, "GENERAL_LEAVE", 1))).isEqualByComparingTo("2");
         assertThat(month(b1, "GENERAL_LEAVE", 2).subtract(month(b0, "GENERAL_LEAVE", 2))).isEqualByComparingTo("2");
-        assertThat(month(b1, "PERMESSO", 2).subtract(month(b0, "PERMESSO", 2))).isEqualByComparingTo("3");
+        assertThat(month(b1, "PERMESSO", 2).subtract(month(b0, "PERMESSO", 2))).isEqualByComparingTo("4");
         assertThat(month(b1, "CLIENT_OFFICE", 2).subtract(month(b0, "CLIENT_OFFICE", 2))).isEqualByComparingTo("1");
         assertThat(b1.get("years").toString()).contains(String.valueOf(y + 1));
         // Tipologia e team
