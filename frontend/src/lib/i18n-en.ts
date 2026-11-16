@@ -249,6 +249,17 @@ export const EN: Record<string, string> = {
   "reset password chiesto": "password reset requested",
   "ha reimpostato la password con il link": "reset the password with the link",
   "troppe richieste di reset password": "too many password reset requests",
+  "Apri questo sito con Safari.": "Open this site in Safari.",
+  "Tocca Condividi": "Tap Share",
+  "in basso (o in alto su iPad).": "at the bottom (or at the top on iPad).",
+  "Scegli «Aggiungi alla schermata Home»": "Choose “Add to Home Screen”",
+  "Tocca «Aggiungi»: l'icona Ferie compare tra le tue app.": "Tap “Add”: the Ferie icon appears among your apps.",
+  "Usa l'app sul telefono": "Use the app on your phone",
+  "Android: scarica l'APK": "Android: download the APK",
+  "iPhone: aggiungi alla schermata Home": "iPhone: add to Home Screen",
+  "Soluzione temporanea: l'app per iPhone è in arrivo.": "Temporary solution: the iPhone app is coming soon.",
+  "Su iPhone? Aggiungi alla schermata Home": "On iPhone? Add to Home Screen",
+  "Incolla il link per scaricare l'APK (per esempio quello della build EAS). In home e nella pagina di accesso comparirà il pulsante per Android; i passi per iPhone (aggiungi alla schermata Home) si vedono sempre.": "Paste the link to download the APK (for example the EAS build link). The Android button will appear on the home page and on the sign-in page; the iPhone steps (add to Home Screen) are always shown.",
 }
 
 /** Messaggi del server (italiano) -> inglese. Prima le frasi fisse, poi quelle con parti variabili. */

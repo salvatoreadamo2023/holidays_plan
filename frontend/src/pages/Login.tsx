@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Download, Lock, Mail, User } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Lock, Mail, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../lib/auth'
 import { Aurora, Logo } from '../components/Layout'
@@ -9,6 +9,7 @@ import { typeEmoji } from '../lib/format'
 import { LangToggle, t } from '../lib/i18n'
 import { api } from '../lib/api'
 import { useAuthOptions } from '../lib/settings'
+import { LoginAppLinks } from '../components/GetApp'
 
 export function Login() {
   const { login } = useAuth()
@@ -100,11 +101,7 @@ export function Login() {
             <button type="button" onClick={back} className="flex w-full items-center justify-center gap-1 text-sm font-medium text-violet-600 hover:underline dark:text-violet-300"><ArrowLeft size={15} /> {t('Torna all\'accesso')}</button>
           </div>
         )}
-        {opts?.apkUrl && (
-          <a href={opts.apkUrl} target="_blank" rel="noopener noreferrer" className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-soft py-2.5 text-sm font-medium text-muted hover:text-[var(--text)]">
-            <Download size={16} /> {t('Scarica l\'app Android')}
-          </a>
-        )}
+        <LoginAppLinks apkUrl={opts?.apkUrl} />
       </motion.div>
     </div>
   )

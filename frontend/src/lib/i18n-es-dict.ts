@@ -572,6 +572,17 @@ export const ES_DICT: Record<string, string> = {
   "Saldo al mese": "Saldo al mes",
   "Non caricato": "No cargado",
   "Tipo": "Tipo",
+  "Apri questo sito con Safari.": "Abre este sitio con Safari.",
+  "Tocca Condividi": "Toca Compartir",
+  "in basso (o in alto su iPad).": "abajo (o arriba en iPad).",
+  "Scegli «Aggiungi alla schermata Home»": "Elige «Añadir a pantalla de inicio»",
+  "Tocca «Aggiungi»: l'icona Ferie compare tra le tue app.": "Toca «Añadir»: el icono Ferie aparece entre tus apps.",
+  "Usa l'app sul telefono": "Usa la app en el teléfono",
+  "Android: scarica l'APK": "Android: descarga el APK",
+  "iPhone: aggiungi alla schermata Home": "iPhone: añade a la pantalla de inicio",
+  "Soluzione temporanea: l'app per iPhone è in arrivo.": "Solución temporal: la app para iPhone llegará pronto.",
+  "Su iPhone? Aggiungi alla schermata Home": "¿En iPhone? Añade a la pantalla de inicio",
+  "Incolla il link per scaricare l'APK (per esempio quello della build EAS). In home e nella pagina di accesso comparirà il pulsante per Android; i passi per iPhone (aggiungi alla schermata Home) si vedono sempre.": "Pega el enlace para descargar el APK (por ejemplo el de la build de EAS). En el inicio y en la página de acceso aparecerá el botón para Android; los pasos para iPhone (añadir a la pantalla de inicio) se ven siempre.",
 }
 
 export const ES_SERVER: Record<string, string> = {

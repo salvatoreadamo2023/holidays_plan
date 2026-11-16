@@ -55,7 +55,7 @@ export function SettingsTab() {
 
       <Card>
         <div className="mb-1 flex items-center gap-2 font-display text-lg font-semibold"><Smartphone size={18} className="text-violet-500" />{t('App Android (APK)')}</div>
-        <p className="mb-4 text-sm text-muted">{t('Incolla il link per scaricare l\'APK (per esempio quello della build EAS). In home e nella pagina di accesso comparirà il pulsante «Scarica l\'app».')}</p>
+        <p className="mb-4 text-sm text-muted">{t('Incolla il link per scaricare l\'APK (per esempio quello della build EAS). In home e nella pagina di accesso comparirà il pulsante per Android; i passi per iPhone (aggiungi alla schermata Home) si vedono sempre.')}</p>
         <input className={inputCls} type="url" placeholder="https://…" value={apk} onChange={e => setApk(e.target.value)} maxLength={1000} />
         <p className="mt-2 text-xs text-muted">{t('Lascia vuoto per nascondere il pulsante.')}</p>
       </Card>

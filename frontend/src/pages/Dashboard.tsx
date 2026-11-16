@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { ArrowRight, Building2, CheckCheck, Download, Smartphone, Clock, Plane, Plus, Thermometer } from 'lucide-react'
+import { ArrowRight, Building2, CheckCheck, Clock, Plane, Plus, Thermometer } from 'lucide-react'
 import { Link } from 'react-router'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { api } from '../lib/api'
@@ -12,6 +12,7 @@ import { Avatar, Card, Empty, SectionTitle, StatusChip, TypeIcon } from '../comp
 import { YearHeatmap } from '../components/YearHeatmap'
 import { BalanceCard } from '../components/BalanceCard'
 import { useSettings } from '../lib/settings'
+import { GetAppCard } from '../components/GetApp'
 import { t, t as tt } from '../lib/i18n'
 
 const greet = () => { const h = new Date().getHours(); return t(h < 12 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera') }
@@ -147,23 +148,8 @@ export function Dashboard() {
   )
 }
 
-/** Scarica l'app Android: compare solo se l'admin ha impostato il link dell'APK. */
+/** App sul telefono: APK per Android (se impostato dall'admin) e passi per iPhone. */
 function ApkCard() {
   const { apkUrl } = useSettings()
-  if (!apkUrl) return null
-  return (
-    <Card className="relative overflow-hidden">
-      <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-500/20 blur-2xl" />
-      <div className="flex items-center gap-3">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white"><Smartphone size={20} /></div>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold">{t('App per Android')}</div>
-          <div className="text-xs text-muted">{t('Richieste, approvazioni e notifiche push sul telefono.')}</div>
-        </div>
-      </div>
-      <a href={apkUrl} target="_blank" rel="noopener noreferrer" className="btn-primary mt-4 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold">
-        <Download size={16} /> {t('Scarica l\'APK')}
-      </a>
-    </Card>
-  )
+  return <GetAppCard apkUrl={apkUrl} Card={Card} />
 }
