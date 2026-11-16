@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import clsx from 'clsx'
@@ -7,6 +7,7 @@ import { iso, num, range, reasonLabel, typeShort, typeText } from '../lib/format
 import type { AbsenceType, CreateRequest, LeaveReason, RequestView } from '../lib/types'
 import { Button, Field, inputCls, Modal } from './ui'
 import { t } from '../lib/i18n'
+import { HoursPicker } from './HoursPicker'
 
 const types: AbsenceType[] = ['FERIE', 'PERMESSO', 'GENERAL_LEAVE', 'CLIENT_OFFICE', 'BUSINESS_TRIP']
 const reasons = Object.keys(reasonLabel) as LeaveReason[]
@@ -23,6 +24,7 @@ export function AmendModal({ request, onClose, manager = false }: { request: Req
     if (request) setForm({ type: request.type, startDate: request.startDate, endDate: request.endDate, hours: request.hours ?? 2, note: request.note ?? '', leaveReason: request.leaveReason })
   }, [request])
   const set = <K extends keyof CreateRequest>(k: K, v: CreateRequest[K]) => setForm(f => ({ ...f, [k]: v }))
+  const setHours = useCallback((h: number) => setForm(f => ({ ...f, hours: h })), [])
   const single = form.type === 'PERMESSO'
   const minStart = request && request.startDate < today ? request.startDate : today
 
@@ -68,7 +70,7 @@ export function AmendModal({ request, onClose, manager = false }: { request: Req
           </div>
           {form.type === 'PERMESSO' && (
             <Field label={t('Ore di permesso: {n}', { n: num(form.hours) })}>
-              <input type="range" min={0.5} max={8} step={0.5} value={form.hours ?? 1} onChange={e => set('hours', Number(e.target.value))} className="w-full accent-amber-500" />
+<HoursPicker value={form.hours ?? null} onChange={setHours} />
             </Field>
           )}
           {form.type === 'GENERAL_LEAVE' && (

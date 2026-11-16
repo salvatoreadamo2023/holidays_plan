@@ -1,18 +1,34 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, Lock, User } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Download, Lock, Mail, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../lib/auth'
 import { Aurora, Logo } from '../components/Layout'
 import { inputCls } from '../components/ui'
 import { typeEmoji } from '../lib/format'
 import { LangToggle, t } from '../lib/i18n'
+import { api } from '../lib/api'
+import { useAuthOptions } from '../lib/settings'
 
 export function Login() {
   const { login } = useAuth()
+  const opts = useAuthOptions()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
+  const [mode, setMode] = useState<'login' | 'forgot' | 'sent'>(() =>
+    typeof window !== 'undefined' && window.location.pathname === '/password-dimenticata' ? 'forgot' : 'login')
+  const [email, setEmail] = useState('')
+  const reset = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').has('reset')
+
+  const forgot = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true)
+    try {
+      await api('/api/auth/password-forgot', { method: 'POST', json: { username: username.trim(), email: email.trim() } })
+      setMode('sent')
+    } catch (err) { toast.error((err as Error).message) } finally { setBusy(false) }
+  }
+  const back = () => { setMode('login'); if (window.location.pathname !== '/') window.history.replaceState(null, '', '/') }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true)
@@ -38,6 +54,8 @@ export function Login() {
           {t('Addio Excel.')}<br /><span className="gradient-text">{t('Ciao ferie.')}</span>
         </h1>
         <p className="mt-3 text-sm text-muted">{t('Chiedi, approva e pianifica le assenze del tuo team in pochi secondi.')}</p>
+        {reset && mode === 'login' && <p className="mt-6 rounded-2xl bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">{t('Password aggiornata: accedi con la nuova password')}</p>}
+        {mode === 'login' && (<>
         <form onSubmit={submit} className="mt-8 space-y-4">
           <div className="relative">
             <User size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
@@ -51,6 +69,42 @@ export function Login() {
             {busy ? t('Accesso…') : t('Entra')} <ArrowRight size={18} className="transition group-hover:translate-x-1" />
           </button>
         </form>
+        {opts?.passwordReset && (
+          <button type="button" onClick={() => setMode('forgot')} className="mt-4 w-full text-center text-sm font-medium text-violet-600 hover:underline dark:text-violet-300">{t('Password dimenticata?')}</button>
+        )}
+        </>)}
+        {mode === 'forgot' && (
+          <form onSubmit={forgot} className="mt-8 space-y-4">
+            <div>
+              <h2 className="font-display text-xl font-semibold">{t('Password dimenticata?')}</h2>
+              <p className="mt-1 text-sm text-muted">{t('Scrivi il tuo username e l\'email aziendale: ti mandiamo un link per scegliere una nuova password.')}</p>
+            </div>
+            <div className="relative">
+              <User size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+              <input className={`${inputCls} pl-10`} placeholder="Username" autoComplete="username" maxLength={100} value={username} onChange={e => setUsername(e.target.value)} required />
+            </div>
+            <div className="relative">
+              <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+              <input className={`${inputCls} pl-10`} type="email" placeholder={t('Email')} autoComplete="email" maxLength={254} value={email} onChange={e => setEmail(e.target.value)} required />
+            </div>
+            <button disabled={busy} className="btn-primary flex w-full items-center justify-center gap-2 rounded-xl py-3.5 font-semibold transition active:scale-[.98] disabled:opacity-60">
+              {busy ? t('Invio…') : t('Mandami il link')} <Mail size={18} />
+            </button>
+            <button type="button" onClick={back} className="flex w-full items-center justify-center gap-1 text-sm text-muted hover:text-[var(--text)]"><ArrowLeft size={15} /> {t('Torna all\'accesso')}</button>
+          </form>
+        )}
+        {mode === 'sent' && (
+          <div className="mt-8 space-y-4">
+            <div className="text-4xl">📬</div>
+            <p className="text-sm">{t('Se username ed email corrispondono a un utente, riceverai a breve un\'email con il link per scegliere una nuova password. Il link vale 30 minuti e si può usare una sola volta. Controlla anche la cartella spam.')}</p>
+            <button type="button" onClick={back} className="flex w-full items-center justify-center gap-1 text-sm font-medium text-violet-600 hover:underline dark:text-violet-300"><ArrowLeft size={15} /> {t('Torna all\'accesso')}</button>
+          </div>
+        )}
+        {opts?.apkUrl && (
+          <a href={opts.apkUrl} target="_blank" rel="noopener noreferrer" className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-soft py-2.5 text-sm font-medium text-muted hover:text-[var(--text)]">
+            <Download size={16} /> {t('Scarica l\'app Android')}
+          </a>
+        )}
       </motion.div>
     </div>
   )

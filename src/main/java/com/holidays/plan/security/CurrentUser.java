@@ -6,6 +6,7 @@ import com.holidays.plan.service.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
 /** Risolve sempre l'utente dal token: mai da id passati dal client. */
@@ -41,6 +42,13 @@ public class CurrentUser {
         User u = users.findById(id).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Sessione non valida"));
         if (!u.isActive()) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Utente disattivato");
+        }
+        // Dopo un reset con link via email, i token emessi prima del cambio non valgono piu'.
+        if (u.getPasswordChangedAt() != null && auth instanceof JwtAuthenticationToken jwt) {
+            java.time.Instant iat = jwt.getToken().getIssuedAt();
+            if (iat == null || iat.plusSeconds(1).isBefore(u.getPasswordChangedAt())) {
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "Password cambiata, accedi di nuovo");
+            }
         }
         // Il ruolo nel token deve coincidere con quello attuale: se l'admin lo cambia, il vecchio token decade.
         boolean roleMatches = auth.getAuthorities().stream()

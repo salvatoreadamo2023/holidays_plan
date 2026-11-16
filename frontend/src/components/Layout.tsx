@@ -11,6 +11,7 @@ import { roleLabel } from '../lib/format'
 import type { RequestView } from '../lib/types'
 import { Avatar } from './ui'
 import { CommandPalette } from './CommandPalette'
+import { NotificationBell } from './NotificationBell'
 import { NewRequestDrawer } from './NewRequestDrawer'
 import { LangToggle, t } from '../lib/i18n'
 
@@ -58,7 +59,10 @@ export function Layout() {
     <div className="relative min-h-full">
       <Aurora />
       <aside className="glass fixed inset-y-3 left-3 z-30 hidden w-64 flex-col rounded-3xl p-4 lg:flex">
-        <Logo />
+        <div className="flex items-center justify-between gap-2">
+          <Logo />
+          <NotificationBell className="grid h-9 w-9 place-items-center rounded-xl border border-soft text-muted hover:text-[var(--text)]" panelClass="absolute left-full top-0 ml-6 w-96" />
+        </div>
         <button onClick={() => openRequest()} className="btn-primary mt-6 flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold transition active:scale-95">
           <Plus size={18} /> {t('Nuova richiesta')}
         </button>
@@ -100,6 +104,7 @@ export function Layout() {
       <header className="glass sticky top-0 z-30 flex items-center justify-between px-4 py-3 lg:hidden">
         <Logo />
         <div className="flex items-center gap-1">
+          <NotificationBell className="grid h-9 w-9 place-items-center rounded-lg" panelClass="fixed inset-x-3 top-16" />
           <LangToggle className="grid h-9 w-9 place-items-center rounded-lg" />
           <button onClick={toggleDark} className="rounded-lg p-2" aria-label={t('Cambia tema')}>{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
           <Link to="/password" className="rounded-lg p-2" aria-label={t('Cambia password')}><KeyRound size={18} /></Link>

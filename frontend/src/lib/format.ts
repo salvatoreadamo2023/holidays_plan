@@ -1,13 +1,14 @@
 import { format, parseISO } from 'date-fns'
-import { enGB, it } from 'date-fns/locale'
+import { enGB, es, it } from 'date-fns/locale'
 import type { AbsenceType, LeaveReason, Role, Status } from './types'
 import { getLang, t, tr } from './i18n'
 
-export const fmt = (d: string | Date, f = 'd MMM yyyy') => format(typeof d === 'string' ? parseISO(d) : d, f, { locale: getLang() === 'en' ? enGB : it })
+export const dateLocale = () => (getLang() === 'en' ? enGB : getLang() === 'es' ? es : it)
+export const fmt = (d: string | Date, f = 'd MMM yyyy') => format(typeof d === 'string' ? parseISO(d) : d, f, { locale: dateLocale() })
 export const iso = (d: Date) => format(d, 'yyyy-MM-dd')
 
 export const num = (n: number | null | undefined) =>
-  n == null ? '–' : Number(n).toLocaleString(getLang() === 'en' ? 'en-GB' : 'it-IT', { maximumFractionDigits: 1 })
+  n == null ? '–' : Number(n).toLocaleString(getLang() === 'en' ? 'en-GB' : getLang() === 'es' ? 'es-ES' : 'it-IT', { maximumFractionDigits: 1 })
 
 export const typeLabel: Record<AbsenceType | 'ASSENZA', string> = tr({
   FERIE: 'Ferie', PERMESSO: 'Permesso', GENERAL_LEAVE: 'General leave', CLIENT_OFFICE: 'Presso cliente (CO)', BUSINESS_TRIP: 'Trasferta (BT)', TENTATIVE: 'Ferie ipotetiche (TH)', ASSENZA: 'Assente',

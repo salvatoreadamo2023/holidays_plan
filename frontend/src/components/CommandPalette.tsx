@@ -4,7 +4,7 @@ import { CalendarRange, CheckCheck, Home, Languages, ListChecks, LogOut, Moon, P
 import { useNavigate } from 'react-router'
 import { isAdmin, isManager, useAuth } from '../lib/auth'
 import { useUi } from '../lib/ui'
-import { t, useLang } from '../lib/i18n'
+import { LANGS, t, useLang } from '../lib/i18n'
 
 export function CommandPalette() {
   const { paletteOpen, setPaletteOpen, openRequest, toggleDark, dark } = useUi()
@@ -28,7 +28,7 @@ export function CommandPalette() {
                 <Command.Group heading={t('Azioni')} className="px-1 text-xs text-muted">
                   <Command.Item className={item} onSelect={() => run(() => openRequest())}><Plus size={16} /> {t('Nuova richiesta di ferie')}</Command.Item>
                   <Command.Item className={item} onSelect={() => run(() => openRequest())}><Plus size={16} /> {t('Nuovo permesso a ore')}</Command.Item>
-                  <Command.Item className={item} onSelect={() => run(() => setLang(lang === 'it' ? 'en' : 'it'))}><Languages size={16} /> {lang === 'it' ? 'English' : 'Italiano'}</Command.Item>
+                  {LANGS.filter(l => l.code !== lang).map(l => <Command.Item key={l.code} className={item} onSelect={() => run(() => setLang(l.code))}><Languages size={16} /> {l.label}</Command.Item>)}
                   <Command.Item className={item} onSelect={() => run(toggleDark)}>{dark ? <Sun size={16} /> : <Moon size={16} />} {dark ? t('Tema chiaro') : t('Tema scuro')}</Command.Item>
                 </Command.Group>
                 <Command.Group heading={t('Vai a')} className="px-1 text-xs text-muted">

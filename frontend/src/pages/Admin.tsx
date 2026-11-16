@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Building2, CalendarHeart, ChevronLeft, ChevronRight, History, Wallet, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
+import { Building2, CalendarHeart, ChevronLeft, ChevronRight, History, SlidersHorizontal, Wallet, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
@@ -10,6 +10,7 @@ import type { AbsenceType, AreaAdmin, HolidayAdmin, Role, TeamAdmin, UserAdmin }
 import { Avatar, Button, Card, Field, inputCls, Modal, Pager, usePaged } from '../components/ui'
 import { t, t as tt } from '../lib/i18n'
 import { BalancesTab } from '../components/BalancesTab'
+import { SettingsTab } from '../components/SettingsTab'
 
 const tabs = [
   { key: 'users', label: 'Persone', icon: Users },
@@ -18,6 +19,7 @@ const tabs = [
   { key: 'holidays', label: 'Festività', icon: CalendarHeart },
   { key: 'balances', label: 'Saldi', icon: Wallet },
   { key: 'audit', label: 'Storico', icon: History },
+  { key: 'settings', label: 'Impostazioni', icon: SlidersHorizontal },
 ] as const
 type Tab = typeof tabs[number]['key']
 
@@ -45,6 +47,7 @@ export function Admin() {
       {tab === 'holidays' && <HolidaysTab />}
       {tab === 'balances' && <BalancesTab />}
       {tab === 'audit' && <AuditTab />}
+      {tab === 'settings' && <SettingsTab />}
     </div>
   )
 }
@@ -285,7 +288,7 @@ export const auditLabel: Record<string, string> = {
   CREATED: 'ha creato una richiesta', APPROVED: 'ha approvato', REJECTED: 'ha rifiutato', WITHDRAWN: 'ha ritirato',
   CANCEL_REQUESTED: "ha chiesto l'annullamento", CANCELLED: "ha confermato l'annullamento", CANCEL_DENIED: "ha respinto l'annullamento",
   ATTACHMENT_ADDED: 'ha allegato un file', ATTACHMENT_REMOVED: 'ha tolto un allegato', CERTIFICATE_REMINDER: 'promemoria certificato inviato', AUTO_APPROVED: 'approvazione automatica (nessun responsabile)', AUTO_CANCELLED: 'annullamento automatico (nessun responsabile)', SICK_RECORDED: 'malattia registrata', RECORDED: 'registrata senza approvazione', CREATED_ON_BEHALF: "ha inserito un'assenza per conto di", DAYS_RECOMPUTED: 'giorni ricalcolati (chiusura aziendale)',
-  USER_CREATED: 'ha creato un utente', USER_UPDATED: 'ha modificato un utente', PASSWORD_RESET: 'ha reimpostato una password', CONVERTED: 'ha trasformato le ferie ipotetiche in richiesta', BALANCES_UPLOADED: 'ha caricato i saldi residui', AMEND_REQUESTED: 'ha chiesto una rettifica', AMENDED_BY_MANAGER: 'ha rettificato un\'assenza', AMENDED: 'sostituita dalla rettifica', REVOKED: 'ha annullato un\'assenza',
+  USER_CREATED: 'ha creato un utente', USER_UPDATED: 'ha modificato un utente', PASSWORD_RESET: 'ha reimpostato una password', CONVERTED: 'ha trasformato le ferie ipotetiche in richiesta', BALANCES_UPLOADED: 'ha caricato i saldi residui', AMEND_REQUESTED: 'ha chiesto una rettifica', AMENDED_BY_MANAGER: 'ha rettificato un\'assenza', AMENDED: 'sostituita dalla rettifica', REVOKED: 'ha annullato un\'assenza', SETTINGS_UPDATED: 'ha cambiato le impostazioni', PASSWORD_RESET_REQUESTED: 'reset password chiesto', PASSWORD_RESET_DONE: 'ha reimpostato la password con il link', PASSWORD_RESET_LIMIT: 'troppe richieste di reset password',
 }
 
 const AUDIT_PAGE = 10

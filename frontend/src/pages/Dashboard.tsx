@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { ArrowRight, CalendarOff, CheckCheck, Clock, Plane, Plus, Thermometer } from 'lucide-react'
+import { ArrowRight, Building2, CheckCheck, Download, Smartphone, Clock, Plane, Plus, Thermometer } from 'lucide-react'
 import { Link } from 'react-router'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { api } from '../lib/api'
@@ -11,6 +11,7 @@ import type { Dashboard as D, RequestView } from '../lib/types'
 import { Avatar, Card, Empty, SectionTitle, StatusChip, TypeIcon } from '../components/ui'
 import { YearHeatmap } from '../components/YearHeatmap'
 import { BalanceCard } from '../components/BalanceCard'
+import { useSettings } from '../lib/settings'
 import { t, t as tt } from '../lib/i18n'
 
 const greet = () => { const h = new Date().getHours(); return t(h < 12 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera') }
@@ -72,7 +73,7 @@ export function Dashboard() {
                   { label: t('Ferie'), value: d.trend.leaveDays, unit: t('giorni'), pending: d.trend.leavePending, icon: <Plane size={18} />, cls: 'from-violet-500 to-fuchsia-500' },
                   { label: t('Permessi'), value: d.trend.permitHours, unit: t('ore'), pending: d.trend.permitPending, icon: <Clock size={18} />, cls: 'from-amber-500 to-rose-500' },
                   { label: 'General leave', value: d.trend.sickDays, unit: t('giorni'), pending: 0, icon: <Thermometer size={18} />, cls: 'from-fuchsia-500 to-fuchsia-400' },
-                  { label: t('Assente'), value: d.trend.absenceDays, unit: t('giorni in tutto'), pending: 0, icon: <CalendarOff size={18} />, cls: 'from-slate-500 to-slate-800' },
+                  { label: t('Presso cliente (CO)'), value: d.trend.clientOfficeDays, unit: t('giorni'), pending: d.trend.clientOfficePending, icon: <Building2 size={18} />, cls: 'from-emerald-500 to-teal-600' },
                 ].map(t => (
                   <div key={t.label} className="rounded-2xl border border-soft p-4">
                     <div className={`mb-3 grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br ${t.cls} text-white`}>{t.icon}</div>
@@ -84,7 +85,7 @@ export function Dashboard() {
                 ))}
               </div>
             )}
-            <p className="mt-4 text-xs text-muted">{t('Conteggi dalle richieste approvate dell\'anno. "Assente" somma ferie, general leave e permessi (8 ore = 1 giorno). CO e trasferte non contano.')}</p>
+            <p className="mt-4 text-xs text-muted">{t('Conteggi dalle richieste approvate dell\'anno. CO sono i giorni lavorati presso il cliente: non sono assenze.')}</p>
           </Card>
         </motion.div>
 
@@ -105,6 +106,7 @@ export function Dashboard() {
             </Link>
           )}
           <BalanceCard />
+          <ApkCard />
           <Card>
             <SectionTitle><span className="flex items-center gap-2"><Plane size={18} /> {t('Fuori oggi')}</span></SectionTitle>
             {d && d.absentToday.length > 0 ? (
@@ -142,5 +144,26 @@ export function Dashboard() {
         </Card>
       </motion.div>
     </motion.div>
+  )
+}
+
+/** Scarica l'app Android: compare solo se l'admin ha impostato il link dell'APK. */
+function ApkCard() {
+  const { apkUrl } = useSettings()
+  if (!apkUrl) return null
+  return (
+    <Card className="relative overflow-hidden">
+      <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-500/20 blur-2xl" />
+      <div className="flex items-center gap-3">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white"><Smartphone size={20} /></div>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold">{t('App per Android')}</div>
+          <div className="text-xs text-muted">{t('Richieste, approvazioni e notifiche push sul telefono.')}</div>
+        </div>
+      </div>
+      <a href={apkUrl} target="_blank" rel="noopener noreferrer" className="btn-primary mt-4 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold">
+        <Download size={16} /> {t('Scarica l\'APK')}
+      </a>
+    </Card>
   )
 }

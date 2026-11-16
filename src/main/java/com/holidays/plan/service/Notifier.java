@@ -17,12 +17,12 @@ import java.util.Objects;
 @Component
 public class Notifier {
     private static final DateTimeFormatter D = DateTimeFormatter.ofPattern("d MMM", Locale.ITALIAN);
-    private final PushService push;
+    private final NotificationService out;
     private final UserRepository users;
     private final AccessPolicy policy;
 
-    public Notifier(PushService push, UserRepository users, AccessPolicy policy) {
-        this.push = push;
+    public Notifier(NotificationService out, UserRepository users, AccessPolicy policy) {
+        this.out = out;
         this.users = users;
         this.policy = policy;
     }
@@ -62,51 +62,51 @@ public class Notifier {
     }
 
     public void created(AbsenceRequest r) {
-        push.notify(approversOf(r.getUser()), "Nuova richiesta da " + r.getUser().getFullName(), what(r), data(r, "Approvazioni"));
+        out.notify(approversOf(r.getUser()), "Nuova richiesta da " + r.getUser().getFullName(), what(r), data(r, "Approvazioni"));
     }
 
     public void decided(AbsenceRequest r, boolean approved) {
         boolean amend = r.getAmends() != null;
-        push.notify(List.of(r.getUser().getId()),
+        out.notify(List.of(r.getUser().getId()),
             amend ? (approved ? "Rettifica approvata ✅" : "Rettifica rifiutata") : (approved ? "Richiesta approvata ✅" : "Richiesta rifiutata"),
             what(r) + (r.getDecisionNote() != null ? " · " + r.getDecisionNote() : ""), data(r, "Richieste"));
     }
 
     public void cancelRequested(AbsenceRequest r) {
-        push.notify(approversOf(r.getUser()), r.getUser().getFullName() + " chiede di annullare", what(r), data(r, "Approvazioni"));
+        out.notify(approversOf(r.getUser()), r.getUser().getFullName() + " chiede di annullare", what(r), data(r, "Approvazioni"));
     }
 
     public void cancelDecided(AbsenceRequest r, boolean accepted) {
-        push.notify(List.of(r.getUser().getId()), accepted ? "Annullamento confermato" : "Annullamento non accettato",
+        out.notify(List.of(r.getUser().getId()), accepted ? "Annullamento confermato" : "Annullamento non accettato",
             what(r), data(r, "Richieste"));
     }
 
     public void leaveRecorded(AbsenceRequest r) {
-        push.notify(approversOf(r.getUser()), r.getUser().getFullName() + " assente", what(r), data(r, "Calendario"));
+        out.notify(approversOf(r.getUser()), r.getUser().getFullName() + " assente", what(r), data(r, "Calendario"));
     }
 
     public void amendRequested(AbsenceRequest r) {
-        push.notify(approversOf(r.getUser()), "Rettifica chiesta da " + r.getUser().getFullName(), what(r), data(r, "Approvazioni"));
+        out.notify(approversOf(r.getUser()), "Rettifica chiesta da " + r.getUser().getFullName(), what(r), data(r, "Approvazioni"));
     }
 
     public void amendedForYou(AbsenceRequest r, User by) {
-        push.notify(List.of(r.getUser().getId()), "La tua assenza e' stata rettificata", what(r) + " · da " + by.getFullName(), data(r, "Richieste"));
+        out.notify(List.of(r.getUser().getId()), "La tua assenza e' stata rettificata", what(r) + " · da " + by.getFullName(), data(r, "Richieste"));
     }
 
     public void revoked(AbsenceRequest r, User by) {
-        push.notify(List.of(r.getUser().getId()), "La tua assenza e' stata annullata",
+        out.notify(List.of(r.getUser().getId()), "La tua assenza e' stata annullata",
             what(r) + " · da " + by.getFullName() + (r.getDecisionNote() != null ? " · " + r.getDecisionNote() : ""), data(r, "Richieste"));
     }
 
     public void insertedForYou(AbsenceRequest r, User by) {
-        push.notify(List.of(r.getUser().getId()), "Assenza inserita per te", what(r) + " · da " + by.getFullName(), data(r, "Richieste"));
+        out.notify(List.of(r.getUser().getId()), "Assenza inserita per te", what(r) + " · da " + by.getFullName(), data(r, "Richieste"));
     }
 
     public void certificateMissing(AbsenceRequest r) {
-        push.notify(List.of(r.getUser().getId()), "Manca il certificato",
+        out.notify(List.of(r.getUser().getId()), "Manca il certificato",
             "Allega il certificato all'assenza del " + D.format(r.getStartDate()) + ".", data(r, "Richieste"));
         List<Long> managers = approversOf(r.getUser()).stream().filter(id -> !Objects.equals(id, r.getUser().getId())).toList();
-        push.notify(managers, "Certificato mancante",
+        out.notify(managers, "Certificato mancante",
             r.getUser().getFullName() + ": assenza del " + D.format(r.getStartDate()) + " ancora senza certificato.", data(r, "Approvazioni"));
     }
 }

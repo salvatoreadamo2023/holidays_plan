@@ -17,6 +17,16 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  # Email via SMTP (Amazon SES come Digisol): SPRING_MAIL_HOST=email-smtp.eu-west-1.amazonaws.com,
+  # SPRING_MAIL_PORT=587, SPRING_MAIL_USERNAME / SPRING_MAIL_PASSWORD = credenziali SMTP di SES.
+  mail:
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
 
 server:
   port: ${PORT:8080}
@@ -35,6 +45,11 @@ app:
   login:
     max-attempts: 5
     lock-minutes: 15
+  # Indirizzo pubblico del sito, usato nei link delle email (reset password, notifiche)
+  base-url: ${APP_BASE_URL:}
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:}
   # Primo Admin: creato solo se il DB non ha utenti e la password è impostata
   first-admin:
     username: ${ADMIN_INITIAL_USERNAME:admin}
@@ -42,6 +57,10 @@ app:
     email: ${ADMIN_INITIAL_EMAIL:admin@azienda.it}
 
 management:
+  health:
+    # Il server SMTP non deve far risultare "giu'" l'applicazione
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:

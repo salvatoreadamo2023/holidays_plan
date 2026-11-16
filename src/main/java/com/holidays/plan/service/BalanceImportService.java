@@ -47,14 +47,16 @@ public class BalanceImportService {
     }
 
     public record BalanceRow(Long userId, String username, String fullName, String team, String referenceMonth,
-                             BigDecimal leaveDays, BigDecimal permitHours, Instant uploadedAt) {}
+                             BigDecimal leaveDays, BigDecimal permitHours, BigDecimal prevLeaveDays, BigDecimal prevPermitHours,
+                             Instant uploadedAt) {}
 
-    public record ImportRow(int row, String username, String fullName, BigDecimal leaveDays, BigDecimal permitHours, String error) {}
+    public record ImportRow(int row, String username, String fullName, BigDecimal leaveDays, BigDecimal permitHours,
+                            BigDecimal prevLeaveDays, BigDecimal prevPermitHours, String error) {}
 
     public record ImportResult(String referenceMonth, boolean applied, int valid, int errors, int missing, List<ImportRow> rows) {}
 
     public record MyBalance(boolean available, String referenceMonth, BigDecimal leaveDays, BigDecimal permitHours,
-                            Instant uploadedAt, BigDecimal leaveRequestedSince, BigDecimal permitRequestedSince) {}
+                            BigDecimal prevLeaveDays, BigDecimal prevPermitHours, Instant uploadedAt, BigDecimal leaveRequestedSince, BigDecimal permitRequestedSince) {}
 
     @Transactional(readOnly = true)
     public List<BalanceRow> list() {
@@ -63,20 +65,22 @@ public class BalanceImportService {
             LeaveBalance b = byUser.get(u.getId());
             return new BalanceRow(u.getId(), u.getUsername(), u.getFullName(), u.getTeam() == null ? null : u.getTeam().getName(),
                 b == null ? null : YearMonth.from(b.getReferenceMonth()).toString(),
-                b == null ? null : b.getLeaveDays(), b == null ? null : b.getPermitHours(), b == null ? null : b.getUploadedAt());
+                b == null ? null : b.getLeaveDays(), b == null ? null : b.getPermitHours(),
+                b == null ? null : b.getPrevLeaveDays(), b == null ? null : b.getPrevPermitHours(), b == null ? null : b.getUploadedAt());
         }).toList();
     }
 
     @Transactional(readOnly = true)
     public MyBalance mine(User u) {
         Optional<LeaveBalance> ob = balances.findById(u.getId());
-        if (ob.isEmpty()) return new MyBalance(false, null, null, null, null, null, null);
+        if (ob.isEmpty()) return new MyBalance(false, null, null, null, null, null, null, null, null);
         LeaveBalance b = ob.get();
         LocalDate from = YearMonth.from(b.getReferenceMonth()).atEndOfMonth().plusDays(1);
         LocalDate to = from.plusYears(3);
         EnumSet<RequestStatus> st = EnumSet.copyOf(RequestStatus.ACTIVE);
         st.add(RequestStatus.PENDING);
-        return new MyBalance(true, YearMonth.from(b.getReferenceMonth()).toString(), b.getLeaveDays(), b.getPermitHours(), b.getUploadedAt(),
+        return new MyBalance(true, YearMonth.from(b.getReferenceMonth()).toString(), b.getLeaveDays(), b.getPermitHours(),
+            b.getPrevLeaveDays(), b.getPrevPermitHours(), b.getUploadedAt(),
             requests.sumAmount(u.getId(), AbsenceType.FERIE, st, from, to),
             requests.sumAmount(u.getId(), AbsenceType.PERMESSO, st, from, to));
     }
@@ -87,10 +91,11 @@ public class BalanceImportService {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Workbook wb = new Workbook(out, "GestioneFerie", "1.0");
             Worksheet ws = wb.newWorksheet("Saldi");
-            String[] head = {"Username", "Nome e cognome", "Team", "Ferie residue (giorni)", "Permessi residui (ore)"};
+            String[] head = {"Username", "Nome e cognome", "Team", "Ferie residue (giorni)", "Permessi residui (ore)",
+                "Ferie AP (giorni)", "Permessi AP (ore)"};
             for (int c = 0; c < head.length; c++) ws.value(0, c, head[c]);
             ws.range(0, 0, 0, head.length - 1).style().bold().fillColor("E31937").fontColor("FFFFFF").set();
-            ws.width(0, 18); ws.width(1, 28); ws.width(2, 18); ws.width(3, 22); ws.width(4, 22);
+            ws.width(0, 18); ws.width(1, 28); ws.width(2, 18); ws.width(3, 22); ws.width(4, 22); ws.width(5, 20); ws.width(6, 20);
             ws.freezePane(0, 1);
             int r = 1;
             for (BalanceRow b : list()) {
@@ -99,6 +104,8 @@ public class BalanceImportService {
                 ws.value(r, 2, b.team() == null ? "" : b.team());
                 if (b.leaveDays() != null) ws.value(r, 3, b.leaveDays());
                 if (b.permitHours() != null) ws.value(r, 4, b.permitHours());
+                if (b.prevLeaveDays() != null) ws.value(r, 5, b.prevLeaveDays());
+                if (b.prevPermitHours() != null) ws.value(r, 6, b.prevPermitHours());
                 r++;
             }
             Worksheet info = wb.newWorksheet("Istruzioni");
@@ -108,7 +115,8 @@ public class BalanceImportService {
                 "2. Usa i valori della busta paga del mese scelto al caricamento.",
                 "3. Non cambiare la colonna Username: serve a riconoscere la persona. Nome e Team sono solo di aiuto.",
                 "4. Una cella vuota significa \"dato non disponibile\". Le righe senza username vengono ignorate.",
-                "5. Il saldo e' solo informativo: non blocca le richieste di ferie o permessi.",
+                "5. Le colonne AP (anno precedente) sono facoltative: indica il residuo dell'anno scorso ancora da godere, se la busta paga lo riporta a parte.",
+                "6. Il saldo e' solo informativo: non blocca le richieste di ferie o permessi.",
             };
             for (int i = 0; i < lines.length; i++) info.value(i, 0, lines[i]);
             info.style(0, 0).bold().fontSize(13).set();
@@ -138,14 +146,15 @@ public class BalanceImportService {
             throw ApiException.bad("File Excel non leggibile: usa il modello scaricabile");
         }
 
-        int headerRow = -1, cUser = -1, cLeave = -1, cPermit = -1;
+        int headerRow = -1, cUser = -1, cLeave = -1, cPermit = -1, cPrevLeave = -1, cPrevPermit = -1;
         for (int r = 0; r < Math.min(sheet.size(), 20) && headerRow < 0; r++) {
             List<String> row = sheet.get(r);
             for (int c = 0; c < row.size(); c++) {
                 String h = row.get(c).toLowerCase(Locale.ROOT);
+                boolean ap = h.matches(".*(^|\\W)ap(\\W|$).*") || h.contains("a.p.") || h.contains("anno prec");
                 if (h.startsWith("username")) cUser = c;
-                else if (h.startsWith("ferie")) cLeave = c;
-                else if (h.startsWith("permess")) cPermit = c;
+                else if (h.startsWith("ferie")) { if (ap) cPrevLeave = c; else cLeave = c; }
+                else if (h.startsWith("permess")) { if (ap) cPrevPermit = c; else cPermit = c; }
             }
             if (cUser >= 0) headerRow = r;
         }
@@ -163,17 +172,19 @@ public class BalanceImportService {
             if (username.isEmpty()) continue;
             User u = byUsername.get(username.toLowerCase(Locale.ROOT));
             String err = null;
-            BigDecimal leave = null, permit = null;
+            BigDecimal leave = null, permit = null, prevLeave = null, prevPermit = null;
             if (u == null) err = "Username sconosciuto o persona disattivata";
             else if (!seen.add(u.getId())) err = "Persona ripetuta: vale la prima riga";
             else {
                 try {
                     leave = number(cell(row, cLeave), MIN_DAYS, MAX_DAYS, "ferie");
                     permit = number(cell(row, cPermit), MIN_HOURS, MAX_HOURS, "permessi");
+                    prevLeave = number(cell(row, cPrevLeave), MIN_DAYS, MAX_DAYS, "ferie AP");
+                    prevPermit = number(cell(row, cPrevPermit), MIN_HOURS, MAX_HOURS, "permessi AP");
                 } catch (IllegalArgumentException e) { err = e.getMessage(); }
             }
-            rows.add(new ImportRow(r + 1, username, u == null ? null : u.getFullName(), leave, permit, err));
-            if (err == null) valid.put(u.getId(), new BigDecimal[]{leave, permit});
+            rows.add(new ImportRow(r + 1, username, u == null ? null : u.getFullName(), leave, permit, prevLeave, prevPermit, err));
+            if (err == null) valid.put(u.getId(), new BigDecimal[]{leave, permit, prevLeave, prevPermit});
             if (rows.size() > 2000) throw ApiException.bad("Troppe righe nel file");
         }
         int errors = (int) rows.stream().filter(x -> x.error() != null).count();
@@ -187,6 +198,8 @@ public class BalanceImportService {
                 b.setReferenceMonth(ym.atDay(1));
                 b.setLeaveDays(v[0]);
                 b.setPermitHours(v[1]);
+                b.setPrevLeaveDays(v[2]);
+                b.setPrevPermitHours(v[3]);
                 b.setUploadedAt(at);
                 b.setUploadedBy(actor.getId());
                 balances.save(b);

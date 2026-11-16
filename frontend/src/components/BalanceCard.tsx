@@ -6,7 +6,7 @@ import { t } from '../lib/i18n'
 import { Card } from './ui'
 import { monthLabel } from './BalancesTab'
 
-export interface MyBalance { available: boolean; referenceMonth: string | null; leaveDays: number | null; permitHours: number | null; uploadedAt: string | null; leaveRequestedSince: number | null; permitRequestedSince: number | null }
+export interface MyBalance { available: boolean; referenceMonth: string | null; leaveDays: number | null; permitHours: number | null; prevLeaveDays: number | null; prevPermitHours: number | null; uploadedAt: string | null; leaveRequestedSince: number | null; permitRequestedSince: number | null }
 
 /** Saldo residuo ufficiale (busta paga) caricato dall'amministrazione: solo informativo. */
 export function BalanceCard() {
@@ -24,10 +24,12 @@ export function BalanceCard() {
         <div className="rounded-2xl border border-soft p-3">
           <div className="font-display text-2xl font-bold">{b.leaveDays == null ? '—' : num(b.leaveDays)}</div>
           <div className="text-xs text-muted">{t('giorni di ferie')}</div>
+          {b.prevLeaveDays != null && <div className="mt-1 text-xs font-medium text-violet-700 dark:text-violet-300">{t('+ {n} AP (anno precedente)', { n: num(b.prevLeaveDays) })}</div>}
         </div>
         <div className="rounded-2xl border border-soft p-3">
           <div className="font-display text-2xl font-bold">{b.permitHours == null ? '—' : num(b.permitHours)}</div>
           <div className="text-xs text-muted">{t('ore di permessi')}</div>
+          {b.prevPermitHours != null && <div className="mt-1 text-xs font-medium text-violet-700 dark:text-violet-300">{t('+ {n} AP (anno precedente)', { n: num(b.prevPermitHours) })}</div>}
         </div>
       </div>
       {since.length > 0 && <p className="mt-3 text-xs">{t('Da allora hai richiesto {x}.', { x: since.join(t(' e ')) })}</p>}

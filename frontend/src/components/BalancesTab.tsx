@@ -7,8 +7,8 @@ import { fmt, num } from '../lib/format'
 import { t } from '../lib/i18n'
 import { Button, Card, Field, inputCls, Pager, SectionTitle, usePaged } from './ui'
 
-interface BalanceRow { userId: number; username: string; fullName: string; team: string | null; referenceMonth: string | null; leaveDays: number | null; permitHours: number | null; uploadedAt: string | null }
-interface ImportRow { row: number; username: string; fullName: string | null; leaveDays: number | null; permitHours: number | null; error: string | null }
+interface BalanceRow { userId: number; username: string; fullName: string; team: string | null; referenceMonth: string | null; leaveDays: number | null; permitHours: number | null; prevLeaveDays: number | null; prevPermitHours: number | null; uploadedAt: string | null }
+interface ImportRow { row: number; username: string; fullName: string | null; leaveDays: number | null; permitHours: number | null; prevLeaveDays: number | null; prevPermitHours: number | null; error: string | null }
 interface ImportResult { referenceMonth: string; applied: boolean; valid: number; errors: number; missing: number; rows: ImportRow[] }
 
 export const monthLabel = (ym: string) => { const s = fmt(ym + '-01', 'MMMM yyyy'); return s.charAt(0).toUpperCase() + s.slice(1) }
@@ -81,7 +81,7 @@ export function BalancesTab() {
           <div className="overflow-auto scrollbar-thin">
             <table className="w-full min-w-[560px] text-sm">
               <thead className="sticky top-0 bg-[var(--surface-strong)] text-left text-xs uppercase tracking-wide text-muted">
-                <tr><th className="py-2 pr-3">{t('Riga')}</th><th className="pr-3">Username</th><th className="pr-3">{t('Persona')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th><th></th></tr>
+                <tr><th className="py-2 pr-3">{t('Riga')}</th><th className="pr-3">Username</th><th className="pr-3">{t('Persona')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th><th className="pr-3 text-right">{t('Ferie AP')}</th><th className="pr-3 text-right">{t('Permessi AP')}</th><th></th></tr>
               </thead>
               <tbody>
                 {ppg.rows.map(r => (
@@ -91,6 +91,8 @@ export function BalancesTab() {
                     <td className="pr-3">{r.fullName ?? '—'}</td>
                     <td className="pr-3 text-right">{r.leaveDays == null ? '—' : num(r.leaveDays)}</td>
                     <td className="pr-3 text-right">{r.permitHours == null ? '—' : num(r.permitHours)}</td>
+                    <td className="pr-3 text-right">{r.prevLeaveDays == null ? '—' : num(r.prevLeaveDays)}</td>
+                    <td className="pr-3 text-right">{r.prevPermitHours == null ? '—' : num(r.prevPermitHours)}</td>
                     <td className="text-xs">{r.error
                       ? <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-300"><AlertTriangle size={13} />{r.error}</span>
                       : <CheckCircle2 size={15} className="text-emerald-600" />}</td>
@@ -110,7 +112,7 @@ export function BalancesTab() {
         <div className="overflow-auto scrollbar-thin">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-muted">
-              <tr><th className="py-2 pr-3">{t('Persona')}</th><th className="pr-3">Team</th><th className="pr-3">{t('Saldo al mese')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th></tr>
+              <tr><th className="py-2 pr-3">{t('Persona')}</th><th className="pr-3">Team</th><th className="pr-3">{t('Saldo al mese')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th><th className="pr-3 text-right">{t('Ferie AP')}</th><th className="pr-3 text-right">{t('Permessi AP')}</th></tr>
             </thead>
             <tbody>
               {pg.rows.map(b => (
@@ -120,6 +122,8 @@ export function BalancesTab() {
                   <td className="pr-3">{b.referenceMonth ? monthLabel(b.referenceMonth) : <span className="text-muted">{t('Non caricato')}</span>}</td>
                   <td className="pr-3 text-right">{b.leaveDays == null ? '—' : num(b.leaveDays)}</td>
                   <td className="pr-3 text-right">{b.permitHours == null ? '—' : num(b.permitHours)}</td>
+                  <td className="pr-3 text-right">{b.prevLeaveDays == null ? '—' : num(b.prevLeaveDays)}</td>
+                  <td className="pr-3 text-right">{b.prevPermitHours == null ? '—' : num(b.prevPermitHours)}</td>
                 </tr>
               ))}
             </tbody>

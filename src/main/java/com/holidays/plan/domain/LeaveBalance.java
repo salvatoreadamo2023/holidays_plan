@@ -28,6 +28,13 @@ public class LeaveBalance {
     @Column(name = "permit_hours", precision = 7, scale = 2)
     private BigDecimal permitHours;
 
+    /** Residuo dell'anno precedente (AP). */
+    @Column(name = "prev_leave_days", precision = 6, scale = 2)
+    private BigDecimal prevLeaveDays;
+
+    @Column(name = "prev_permit_hours", precision = 7, scale = 2)
+    private BigDecimal prevPermitHours;
+
     @Column(name = "uploaded_at", nullable = false)
     private Instant uploadedAt;
 

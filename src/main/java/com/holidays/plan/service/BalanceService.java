@@ -76,6 +76,7 @@ public class BalanceService {
         int f = AbsenceType.FERIE.ordinal(), p = AbsenceType.PERMESSO.ordinal(), m = AbsenceType.GENERAL_LEAVE.ordinal();
         BigDecimal away = ok[AbsenceType.CLIENT_OFFICE.ordinal()].add(ok[AbsenceType.BUSINESS_TRIP.ordinal()]);
         BigDecimal total = ok[f].add(ok[m]).add(ok[p].divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP));
-        return new TrendView(year, ok[f], wait[f], ok[p], wait[p], ok[m], total, away);
+        return new TrendView(year, ok[f], wait[f], ok[p], wait[p], ok[m], total, away,
+            ok[AbsenceType.CLIENT_OFFICE.ordinal()], wait[AbsenceType.CLIENT_OFFICE.ordinal()]);
     }
 }

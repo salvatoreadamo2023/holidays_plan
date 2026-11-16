@@ -27,6 +27,7 @@ export interface Trend {
   leaveDays: number; leavePending: number
   permitHours: number; permitPending: number
   sickDays: number; absenceDays: number; awayDays: number
+  clientOfficeDays: number; clientOfficePending: number
 }
 
 export interface Balance {

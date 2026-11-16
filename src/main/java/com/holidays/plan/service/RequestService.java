@@ -35,9 +35,11 @@ public class RequestService {
     private final AuditService audit;
     private final Notifier notifier;
     private final Clock clock;
+    private final SettingsService settings;
 
     public RequestService(AbsenceRequestRepository requests, UserRepository users, HolidayCalendar calendar,
-                          AccessPolicy policy, AuditService audit, Notifier notifier, Clock clock) {
+                          AccessPolicy policy, AuditService audit, Notifier notifier, Clock clock, SettingsService settings) {
+        this.settings = settings;
         this.requests = requests;
         this.users = users;
         this.calendar = calendar;
@@ -92,6 +94,9 @@ public class RequestService {
                 if (in.hours() == null) throw ApiException.bad("Indica quante ore di permesso");
                 if (in.hours().remainder(new BigDecimal("0.5")).signum() != 0)
                     throw ApiException.bad("Le ore vanno indicate a multipli di mezz'ora");
+                List<BigDecimal> allowed = settings.permitHours();
+                if (allowed.stream().noneMatch(h -> h.compareTo(in.hours()) == 0))
+                    throw ApiException.bad("Durata del permesso non consentita: scegli tra " + String.join(", ", allowed.stream().map(h -> h.toPlainString().replace('.', ',')).toList()) + " ore");
                 if (!calendar.isWorkingDay(in.startDate())) throw ApiException.bad("Il giorno scelto non e' lavorativo");
                 return new Computed(in.hours(), "ore");
             }

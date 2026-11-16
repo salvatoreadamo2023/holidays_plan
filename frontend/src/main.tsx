@@ -17,6 +17,7 @@ import { Approvals } from './pages/Approvals'
 import { Admin } from './pages/Admin'
 import StatsPage from './pages/Stats'
 import { Intro, shouldShowIntro } from './components/Intro'
+import { ResetPassword } from './pages/ResetPassword'
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 15_000, refetchOnWindowFocus: true, retry: 1 } } })
 
@@ -24,6 +25,7 @@ function AppRoutes() {
   const { user, loading } = useAuth()
   const { dark } = useUi()
   const [introDone, setIntroDone] = useState<string | null>(null)
+  if (window.location.pathname === '/password-reset') return <><Toaster theme={dark ? 'dark' : 'light'} position="top-right" richColors closeButton /><ResetPassword /></>
   if (loading) return <div className="grid h-full place-items-center"><div className="h-10 w-10 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" /></div>
   return (
     <>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, CalendarDays, Sparkles, Users } from 'lucide-react'
@@ -11,6 +11,7 @@ import { useUi } from '../lib/ui'
 import { Avatar, Button, Field, inputCls, Modal } from './ui'
 import { ACCEPT, MAX_MB, uploadAttachment } from './Attachments'
 import { t, ts } from '../lib/i18n'
+import { HoursPicker } from './HoursPicker'
 
 const types: AbsenceType[] = ['FERIE', 'PERMESSO', 'GENERAL_LEAVE', 'CLIENT_OFFICE', 'BUSINESS_TRIP', 'TENTATIVE']
 const reasons = Object.keys(reasonLabel) as LeaveReason[]
@@ -78,6 +79,7 @@ export function NewRequestDrawer() {
   })
 
   const set = <K extends keyof CreateRequest>(k: K, v: CreateRequest[K]) => setForm(f => ({ ...f, [k]: v }))
+  const setHours = useCallback((h: number) => setForm(f => ({ ...f, hours: h })), [])
   const p = preview.data
   const err = preview.error as Error | null
 
@@ -136,8 +138,7 @@ export function NewRequestDrawer() {
 
         {form.type === 'PERMESSO' && (
           <Field label={t('Ore di permesso: {n}', { n: num(form.hours) })}>
-            <input type="range" min={0.5} max={8} step={0.5} value={form.hours ?? 1}
-              onChange={e => set('hours', Number(e.target.value))} className="w-full accent-amber-500" />
+<HoursPicker value={form.hours ?? null} onChange={setHours} />
           </Field>
         )}
 
