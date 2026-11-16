@@ -86,13 +86,15 @@ public class AuthController {
         reset.reset(in.token(), in.password(), in.confirm(), clientIp(req));
     }
 
-    /** IP del client: dietro il proxy di Render e' l'ultimo indirizzo di X-Forwarded-For (quello aggiunto dal proxy). */
+    /**
+     * IP del client per i limiti orari. Dietro il proxy di Render il primo indirizzo di X-Forwarded-For e' il client;
+     * chi lo falsifica aggira solo il limite per IP, mentre resta quello per username.
+     */
     static String clientIp(HttpServletRequest req) {
         String xff = req.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) {
-            String[] parts = xff.split(",");
-            String last = parts[parts.length - 1].trim();
-            if (!last.isEmpty() && last.length() <= 45) return last;
+            String first = xff.split(",")[0].trim();
+            if (!first.isEmpty() && first.length() <= 45) return first;
         }
         return req.getRemoteAddr();
     }

@@ -9,7 +9,8 @@ import { LangToggle, t } from '../lib/i18n'
 
 /** Pagina aperta dal link nell'email: sceglie la nuova password. */
 export function ResetPassword() {
-  const token = new URLSearchParams(window.location.search).get('token') ?? ''
+  // Letto una sola volta: subito dopo l'indirizzo viene ripulito e il token non e' piu' nella barra.
+  const [token] = useState(() => new URLSearchParams(window.location.search).get('token') ?? '')
   const [valid, setValid] = useState<boolean | null>(null)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
