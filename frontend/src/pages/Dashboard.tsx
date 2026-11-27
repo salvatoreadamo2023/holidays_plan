@@ -10,7 +10,6 @@ import { isPresence, num, range, typeLabel } from '../lib/format'
 import type { Dashboard as D, RequestView } from '../lib/types'
 import { Avatar, Card, Empty, SectionTitle, StatusChip, TypeIcon } from '../components/ui'
 import { YearHeatmap } from '../components/YearHeatmap'
-import { BalanceCard } from '../components/BalanceCard'
 import { useSettings } from '../lib/settings'
 import { GetAppCard } from '../components/GetApp'
 import { t, t as tt } from '../lib/i18n'
@@ -106,7 +105,6 @@ export function Dashboard() {
               </Card>
             </Link>
           )}
-          <BalanceCard />
           <ApkCard />
           <Card>
             <SectionTitle><span className="flex items-center gap-2"><Plane size={18} /> {t('Fuori oggi')}</span></SectionTitle>

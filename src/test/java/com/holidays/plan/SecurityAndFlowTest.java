@@ -583,7 +583,7 @@ class SecurityAndFlowTest {
     }
 
     @Test
-    void saldiResidui_modelloAnteprimaCaricamentoEVistaPersonale() throws Exception {
+    void saldiResidui_modelloAnteprimaCaricamentoSoloAdmin() throws Exception {
         String admin = token("admin");
         byte[] tpl = mvc.perform(get("/api/admin/balances/template").header("Authorization", admin))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
@@ -607,15 +607,17 @@ class SecurityAndFlowTest {
         assertThat(prev.get("errors").asInt()).isEqualTo(2);
         assertThat(prev.get("applied").asBoolean()).isFalse();
         // anteprima: niente salvato
-        assertThat(json.readTree(mvc.perform(get("/api/balances/me").header("Authorization", token("user")))
-            .andReturn().getResponse().getContentAsString()).get("available").asBoolean()).isFalse();
+        assertThat(balanceOf(admin, "user").get("referenceMonth").isNull()).isTrue();
 
         mvc.perform(multipart("/api/admin/balances/import").file(file).param("month", month).param("apply", "true")
             .header("Authorization", admin)).andExpect(status().isOk());
-        JsonNode me = json.readTree(mvc.perform(get("/api/balances/me").header("Authorization", token("user")))
-            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-        assertThat(me.get("available").asBoolean()).isTrue();
+        JsonNode me = balanceOf(admin, "user");
         assertThat(me.get("referenceMonth").asText()).isEqualTo(month);
+        // il saldo serve solo all'admin: l'utente non lo vede piu'
+        mvc.perform(get("/api/admin/balances").header("Authorization", token("user"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/balances").header("Authorization", token("pm"))).andExpect(status().isForbidden());
+        assertThat(mvc.perform(get("/api/balances/me").header("Authorization", token("user")))
+            .andReturn().getResponse().getStatus()).isNotEqualTo(200);
         assertThat(me.get("leaveDays").decimalValue()).isEqualByComparingTo("14.5");
         assertThat(me.get("permitHours").decimalValue()).isEqualByComparingTo("32");
 
@@ -623,6 +625,13 @@ class SecurityAndFlowTest {
             .andExpect(status().isForbidden());
         mvc.perform(multipart("/api/admin/balances/import").file(file).param("month", "2999-01").header("Authorization", admin))
             .andExpect(status().isBadRequest());
+    }
+
+    private JsonNode balanceOf(String tok, String username) throws Exception {
+        for (JsonNode n : json.readTree(mvc.perform(get("/api/admin/balances").header("Authorization", tok))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()))
+            if (n.get("username").asText().equals(username)) return n;
+        throw new AssertionError("utente non trovato: " + username);
     }
 
     private static String period(LocalDate from, LocalDate to) {

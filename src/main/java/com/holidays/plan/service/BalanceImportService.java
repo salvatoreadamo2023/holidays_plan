@@ -55,9 +55,6 @@ public class BalanceImportService {
 
     public record ImportResult(String referenceMonth, boolean applied, int valid, int errors, int missing, List<ImportRow> rows) {}
 
-    public record MyBalance(boolean available, String referenceMonth, BigDecimal leaveDays, BigDecimal permitHours,
-                            BigDecimal prevLeaveDays, BigDecimal prevPermitHours, Instant uploadedAt, BigDecimal leaveRequestedSince, BigDecimal permitRequestedSince) {}
-
     @Transactional(readOnly = true)
     public List<BalanceRow> list() {
         Map<Long, LeaveBalance> byUser = balances.findAll().stream().collect(Collectors.toMap(LeaveBalance::getUserId, Function.identity()));
@@ -68,21 +65,6 @@ public class BalanceImportService {
                 b == null ? null : b.getLeaveDays(), b == null ? null : b.getPermitHours(),
                 b == null ? null : b.getPrevLeaveDays(), b == null ? null : b.getPrevPermitHours(), b == null ? null : b.getUploadedAt());
         }).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public MyBalance mine(User u) {
-        Optional<LeaveBalance> ob = balances.findById(u.getId());
-        if (ob.isEmpty()) return new MyBalance(false, null, null, null, null, null, null, null, null);
-        LeaveBalance b = ob.get();
-        LocalDate from = YearMonth.from(b.getReferenceMonth()).atEndOfMonth().plusDays(1);
-        LocalDate to = from.plusYears(3);
-        EnumSet<RequestStatus> st = EnumSet.copyOf(RequestStatus.ACTIVE);
-        st.add(RequestStatus.PENDING);
-        return new MyBalance(true, YearMonth.from(b.getReferenceMonth()).toString(), b.getLeaveDays(), b.getPermitHours(),
-            b.getPrevLeaveDays(), b.getPrevPermitHours(), b.getUploadedAt(),
-            requests.sumAmount(u.getId(), AbsenceType.FERIE, st, from, to),
-            requests.sumAmount(u.getId(), AbsenceType.PERMESSO, st, from, to));
     }
 
     /** Excel tipo: una riga per ogni persona attiva, con i saldi attuali gia' compilati se ci sono. */

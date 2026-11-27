@@ -24,12 +24,6 @@ public class BalanceController {
         this.currentUser = currentUser;
     }
 
-    /** Saldo residuo ufficiale di chi e' collegato (solo informativo). */
-    @GetMapping("/api/balances/me")
-    public MyBalance mine() {
-        return service.mine(currentUser.get());
-    }
-
     @GetMapping("/api/admin/balances")
     @PreAuthorize("hasRole('ADMIN')")
     public List<BalanceRow> list() {
