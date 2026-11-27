@@ -58,7 +58,7 @@ export interface CreateRequest { type: AbsenceType; startDate: string; endDate: 
 export interface UserAdmin {
   id: number; username: string; email: string; fullName: string; role: Role
   areaId: number | null; areaName: string | null; teamId: number | null; teamName: string | null
-  active: boolean; annualLeaveDays: number; annualPermitHours: number
+  active: boolean; annualLeaveDays: number; annualPermitHours: number; employeeCode: string | null
 }
 export interface AreaAdmin { id: number; name: string; managerId: number | null; managerName: string | null }
 export interface TeamAdmin { id: number; name: string; areaId: number; areaName: string; leaderId: number | null; leaderName: string | null }

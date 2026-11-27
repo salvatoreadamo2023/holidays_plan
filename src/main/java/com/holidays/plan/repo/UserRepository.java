@@ -16,6 +16,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    Optional<User> findByEmployeeCode(String employeeCode);
+
     @EntityGraph(attributePaths = {"area", "team"})
     List<User> findByAreaIdAndActiveTrueOrderByFullName(Long areaId);
 

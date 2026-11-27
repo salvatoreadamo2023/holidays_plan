@@ -44,7 +44,7 @@ public class BalanceController {
     /** apply=false: anteprima; apply=true: salva le righe valide. */
     @PostMapping(path = "/api/admin/balances/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
-    public ImportResult importFile(@RequestPart("file") MultipartFile file, @RequestParam String month,
+    public ImportResult importFile(@RequestPart("file") MultipartFile file, @RequestParam(required = false) String month,
                                    @RequestParam(defaultValue = "false") boolean apply) {
         return service.importFile(currentUser.get(), file, month, apply);
     }

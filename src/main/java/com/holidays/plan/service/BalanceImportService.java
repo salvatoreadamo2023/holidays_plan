@@ -3,6 +3,7 @@ package com.holidays.plan.service;
 import com.holidays.plan.domain.*;
 import com.holidays.plan.repo.AbsenceRequestRepository;
 import com.holidays.plan.repo.LeaveBalanceRepository;
+import com.holidays.plan.repo.PayrollItemRepository;
 import com.holidays.plan.repo.UserRepository;
 import org.dhatim.fastexcel.Workbook;
 import org.dhatim.fastexcel.Worksheet;
@@ -23,8 +24,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Saldi residui ufficiali (busta paga) caricati dall'admin con un Excel.
- * L'app non li calcola e non li usa per bloccare le richieste: li mostra e basta, con il mese di riferimento.
+ * Saldi residui ufficiali (busta paga) caricati dall'admin con un Excel: il report ratei del cedolino (.xls/.xlsx,
+ * con le voci separate) oppure il modello semplice dell'app. Visibili solo all'admin; servono al riepilogo
+ * delle rimanenze ipotetiche. Non bloccano le richieste.
  */
 @Service
 public class BalanceImportService {
@@ -33,37 +35,56 @@ public class BalanceImportService {
 
     private final LeaveBalanceRepository balances;
     private final UserRepository users;
-    private final AbsenceRequestRepository requests;
+    private final PayrollItemRepository items;
     private final AuditService audit;
     private final Clock clock;
 
-    public BalanceImportService(LeaveBalanceRepository balances, UserRepository users, AbsenceRequestRepository requests,
+    public BalanceImportService(LeaveBalanceRepository balances, UserRepository users, PayrollItemRepository items,
                                 AuditService audit, Clock clock) {
         this.balances = balances;
         this.users = users;
-        this.requests = requests;
+        this.items = items;
         this.audit = audit;
         this.clock = clock;
     }
 
     public record BalanceRow(Long userId, String username, String fullName, String team, String referenceMonth,
                              BigDecimal leaveDays, BigDecimal permitHours, BigDecimal prevLeaveDays, BigDecimal prevPermitHours,
-                             Instant uploadedAt) {}
+                             Instant uploadedAt, String employeeCode, List<ItemView> items) {}
+
+    /** Una voce del cedolino in anteprima: unita' G (giorni) o H (ore). */
+    public record ItemView(String code, String description, String unit, BigDecimal annual, BigDecimal prevBalance,
+                           BigDecimal curBalance, BigDecimal totalResidual, BigDecimal totalProjected, LocalDate deadline) {
+        static ItemView of(PayrollItem i) {
+            return new ItemView(i.getCode(), i.getDescription(), i.getUnit(), i.getAnnualQty(), i.getPrevBalance(), i.getCurBalance(),
+                i.getTotalResidual(), i.getTotalProjected(), i.getDeadline());
+        }
+    }
 
     public record ImportRow(int row, String username, String fullName, BigDecimal leaveDays, BigDecimal permitHours,
-                            BigDecimal prevLeaveDays, BigDecimal prevPermitHours, String error) {}
+                            BigDecimal prevLeaveDays, BigDecimal prevPermitHours, String error,
+                            String employeeCode, String referenceMonth, List<ItemView> items, String note) {
+        ImportRow(int row, String username, String fullName, BigDecimal leaveDays, BigDecimal permitHours,
+                  BigDecimal prevLeaveDays, BigDecimal prevPermitHours, String error) {
+            this(row, username, fullName, leaveDays, permitHours, prevLeaveDays, prevPermitHours, error, null, null, null, null);
+        }
+    }
 
-    public record ImportResult(String referenceMonth, boolean applied, int valid, int errors, int missing, List<ImportRow> rows) {}
+    /** format: PAYROLL (report ratei del cedolino) o TEMPLATE (modello semplice). */
+    public record ImportResult(String referenceMonth, boolean applied, int valid, int errors, int missing, List<ImportRow> rows, String format) {}
 
     @Transactional(readOnly = true)
     public List<BalanceRow> list() {
         Map<Long, LeaveBalance> byUser = balances.findAll().stream().collect(Collectors.toMap(LeaveBalance::getUserId, Function.identity()));
+        Map<Long, List<ItemView>> itemsByUser = items.findAllByOrderByUserIdAscCodeAsc().stream()
+            .collect(Collectors.groupingBy(PayrollItem::getUserId, Collectors.mapping(ItemView::of, Collectors.toList())));
         return users.findByActiveTrueOrderByFullName().stream().map(u -> {
             LeaveBalance b = byUser.get(u.getId());
             return new BalanceRow(u.getId(), u.getUsername(), u.getFullName(), u.getTeam() == null ? null : u.getTeam().getName(),
                 b == null ? null : YearMonth.from(b.getReferenceMonth()).toString(),
                 b == null ? null : b.getLeaveDays(), b == null ? null : b.getPermitHours(),
-                b == null ? null : b.getPrevLeaveDays(), b == null ? null : b.getPrevPermitHours(), b == null ? null : b.getUploadedAt());
+                b == null ? null : b.getPrevLeaveDays(), b == null ? null : b.getPrevPermitHours(), b == null ? null : b.getUploadedAt(),
+                u.getEmployeeCode(), itemsByUser.getOrDefault(u.getId(), List.of()));
         }).toList();
     }
 
@@ -113,20 +134,24 @@ public class BalanceImportService {
     /** Legge l'Excel; con apply=false e' solo un'anteprima, con apply=true salva le righe valide. */
     @Transactional
     public ImportResult importFile(User actor, MultipartFile file, String month, boolean apply) {
-        YearMonth ym;
-        try { ym = YearMonth.parse(month); } catch (Exception e) { throw ApiException.bad("Mese di riferimento non valido"); }
-        YearMonth now = YearMonth.now(clock);
-        if (ym.isAfter(now) || ym.isBefore(now.minusYears(2))) throw ApiException.bad("Il mese di riferimento deve essere tra gli ultimi due anni");
         if (file == null || file.isEmpty()) throw ApiException.bad("Scegli il file Excel da caricare");
         String name = Optional.ofNullable(file.getOriginalFilename()).orElse("").toLowerCase(Locale.ROOT);
-        if (!name.endsWith(".xlsx")) throw ApiException.bad("Il file deve essere un Excel .xlsx (usa il modello scaricabile)");
+        if (!name.endsWith(".xlsx") && !name.endsWith(".xls"))
+            throw ApiException.bad("Il file deve essere un Excel (.xls o .xlsx): il report ratei del cedolino o il modello scaricabile");
 
         List<List<String>> sheet;
         try (InputStream in = file.getInputStream()) {
-            sheet = XlsxReader.firstSheet(in);
+            sheet = SheetReader.firstSheet(in);
         } catch (IOException e) {
-            throw ApiException.bad("File Excel non leggibile: usa il modello scaricabile");
+            throw ApiException.bad("File Excel non leggibile: usa il report ratei del cedolino o il modello scaricabile");
         }
+        int payrollHeader = PayrollImport.headerRow(sheet);
+        if (payrollHeader >= 0) return importPayroll(actor, sheet, payrollHeader, apply);
+
+        YearMonth ym;
+        try { ym = YearMonth.parse(month == null ? "" : month); } catch (Exception e) { throw ApiException.bad("Mese di riferimento non valido"); }
+        YearMonth now = YearMonth.now(clock);
+        if (ym.isAfter(now) || ym.isBefore(now.minusYears(2))) throw ApiException.bad("Il mese di riferimento deve essere tra gli ultimi due anni");
 
         int headerRow = -1, cUser = -1, cLeave = -1, cPermit = -1, cPrevLeave = -1, cPrevPermit = -1;
         for (int r = 0; r < Math.min(sheet.size(), 20) && headerRow < 0; r++) {
@@ -188,7 +213,133 @@ public class BalanceImportService {
             });
             audit.log(actor.getId(), null, "BALANCES_UPLOADED", "Saldi residui " + ym + ": " + valid.size() + " persone");
         }
-        return new ImportResult(ym.toString(), apply, valid.size(), errors, missing, rows);
+        return new ImportResult(ym.toString(), apply, valid.size(), errors, missing, rows, "TEMPLATE");
+    }
+
+    /**
+     * Report ratei del cedolino: le righe di una stessa matricola diventano le voci di quella persona.
+     * Persona riconosciuta dalla matricola; se nessuno ce l'ha, da cognome e nome (e la matricola viene salvata).
+     */
+    private ImportResult importPayroll(User actor, List<List<String>> sheet, int headerRow, boolean apply) {
+        List<PayrollImport.Line> lines = PayrollImport.parse(sheet, headerRow);
+        List<User> active = users.findByActiveTrueOrderByFullName();
+        Map<String, User> byCode = new HashMap<>();
+        Map<String, List<User>> byName = new HashMap<>();
+        for (User u : active) {
+            if (u.getEmployeeCode() != null) byCode.put(u.getEmployeeCode(), u);
+            byName.computeIfAbsent(PayrollImport.person(u.getFullName()), k -> new ArrayList<>()).add(u);
+        }
+        Map<String, List<PayrollImport.Line>> groups = new LinkedHashMap<>();
+        List<ImportRow> rows = new ArrayList<>();
+        for (PayrollImport.Line l : lines) {
+            if (l.code() == null) {
+                rows.add(new ImportRow(l.row(), "", (l.surname() + " " + l.name()).trim(), null, null, null, null, l.error(), null, null, null, null));
+                continue;
+            }
+            groups.computeIfAbsent(l.code(), k -> new ArrayList<>()).add(l);
+        }
+        Map<Long, List<PayrollImport.Line>> valid = new LinkedHashMap<>();
+        Map<Long, String> codesToSet = new HashMap<>();
+        Map<String, Integer> months = new HashMap<>();
+        for (var g : groups.entrySet()) {
+            List<PayrollImport.Line> ls = g.getValue();
+            PayrollImport.Line first = ls.get(0);
+            String fileName = (first.surname() + " " + first.name()).trim();
+            User u = byCode.get(g.getKey());
+            String err = ls.stream().map(PayrollImport.Line::error).filter(Objects::nonNull).findFirst()
+                .map(e -> "Riga " + ls.stream().filter(x -> x.error() != null).findFirst().get().row() + ": " + e).orElse(null);
+            String note = null;
+            if (u == null && err == null) {
+                List<User> c = new ArrayList<>(byName.getOrDefault(PayrollImport.person(first.surname() + " " + first.name()), List.of()));
+                c.addAll(byName.getOrDefault(PayrollImport.person(first.name() + " " + first.surname()), List.of()));
+                c = c.stream().distinct().toList();
+                if (c.size() == 1 && c.get(0).getEmployeeCode() == null) {
+                    u = c.get(0);
+                    codesToSet.put(u.getId(), g.getKey());
+                    note = "Riconosciuta dal nome: le verra' assegnata la matricola " + g.getKey();
+                } else if (c.size() == 1) {
+                    err = "Nell'app " + c.get(0).getFullName() + " ha la matricola " + c.get(0).getEmployeeCode() + ", nel file " + g.getKey();
+                } else if (c.size() > 1) {
+                    err = "Matricola " + g.getKey() + " sconosciuta e piu' persone con questo nome: inserisci la matricola nella scheda della persona";
+                } else {
+                    err = "Matricola " + g.getKey() + " sconosciuta: inseriscila nella scheda della persona";
+                }
+            }
+            if (err == null && ls.stream().map(PayrollImport.Line::month).distinct().count() > 1) err = "Mesi diversi per la stessa persona";
+            if (err == null && ls.stream().map(PayrollImport.Line::rateCode).distinct().count() < ls.size()) err = "Codice rateo ripetuto per la stessa persona";
+            BigDecimal[] agg = aggregate(ls);
+            List<ItemView> views = ls.stream().map(l -> new ItemView(l.rateCode(), l.rateDesc(), l.unit(), l.annual(), l.prevBalance(),
+                l.curBalance(), l.totalResidual(), l.totalProjected(), l.deadline())).toList();
+            String ym = first.month() == null ? null : first.month().toString();
+            rows.add(new ImportRow(first.row(), u == null ? "" : u.getUsername(), u == null ? fileName : u.getFullName(),
+                agg[0], agg[1], agg[2], agg[3], err, g.getKey(), ym, views, note));
+            if (err == null) {
+                valid.put(u.getId(), ls);
+                months.merge(ym, 1, Integer::sum);
+            }
+        }
+        int errors = (int) rows.stream().filter(x -> x.error() != null).count();
+        int missing = (int) active.stream().filter(u -> !valid.containsKey(u.getId())).count();
+        String refMonth = months.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+        if (apply) {
+            if (valid.isEmpty()) throw ApiException.bad("Nessuna persona valida da caricare");
+            Instant at = Instant.now(clock);
+            Map<Long, User> byId = active.stream().collect(Collectors.toMap(User::getId, Function.identity()));
+            valid.forEach((uid, ls) -> {
+                LocalDate month = ls.get(0).month().atDay(1);
+                items.deleteByUser(uid);
+                items.flush();
+                for (PayrollImport.Line l : ls) {
+                    PayrollItem i = new PayrollItem();
+                    i.setUserId(uid);
+                    i.setCode(l.rateCode());
+                    i.setDescription(l.rateDesc() == null || l.rateDesc().isEmpty() ? null : l.rateDesc().substring(0, Math.min(100, l.rateDesc().length())));
+                    i.setUnit(l.unit());
+                    i.setReferenceMonth(month);
+                    i.setAnnualQty(l.annual());
+                    i.setPrevResidual(l.prevResidual());
+                    i.setPrevUsed(l.prevUsed());
+                    i.setPrevBalance(l.prevBalance());
+                    i.setCurAccrued(l.curAccrued());
+                    i.setCurUsed(l.curUsed());
+                    i.setCurBalance(l.curBalance());
+                    i.setTotalResidual(l.totalResidual());
+                    i.setStillAccruable(l.stillAccruable());
+                    i.setTotalProjected(l.totalProjected());
+                    i.setNonCompensable(l.nonCompensable());
+                    i.setDeadline(l.deadline());
+                    i.setUploadedAt(at);
+                    items.save(i);
+                }
+                BigDecimal[] agg = aggregate(ls);
+                LeaveBalance b = balances.findById(uid).orElseGet(LeaveBalance::new);
+                b.setUserId(uid);
+                b.setReferenceMonth(month);
+                b.setLeaveDays(agg[0]);
+                b.setPermitHours(agg[1]);
+                b.setPrevLeaveDays(agg[2]);
+                b.setPrevPermitHours(agg[3]);
+                b.setUploadedAt(at);
+                b.setUploadedBy(actor.getId());
+                balances.save(b);
+                String code = codesToSet.get(uid);
+                if (code != null) byId.get(uid).setEmployeeCode(code);
+            });
+            audit.log(actor.getId(), null, "BALANCES_UPLOADED", "Ratei cedolino " + refMonth + ": " + valid.size() + " persone");
+        }
+        return new ImportResult(refMonth, apply, valid.size(), errors, missing, rows, "PAYROLL");
+    }
+
+    /** Totali per il saldo semplice: {ferie anno, permessi ore anno, ferie AP, permessi ore AP}. */
+    private static BigDecimal[] aggregate(List<PayrollImport.Line> ls) {
+        BigDecimal[] a = new BigDecimal[4];
+        for (PayrollImport.Line l : ls) {
+            int off = "H".equals(l.unit()) ? 1 : 0;
+            if (l.curBalance() != null) a[off] = (a[off] == null ? BigDecimal.ZERO : a[off]).add(l.curBalance());
+            if (l.prevBalance() != null) a[off + 2] = (a[off + 2] == null ? BigDecimal.ZERO : a[off + 2]).add(l.prevBalance());
+        }
+        for (int i = 0; i < 4; i++) if (a[i] != null) a[i] = a[i].setScale(2, java.math.RoundingMode.HALF_UP).stripTrailingZeros();
+        return a;
     }
 
     private static String cell(List<String> row, int c) {

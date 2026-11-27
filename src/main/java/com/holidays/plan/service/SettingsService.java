@@ -15,7 +15,8 @@ import java.util.*;
 /** Impostazioni generali decise dall'admin: ore di permesso consentite, link APK, email di notifica. */
 @Service
 public class SettingsService {
-    static final String PERMIT_HOURS = "permit.hours", APK_URL = "apk.url", EMAIL_NOTIFY = "notify.email";
+    static final String PERMIT_HOURS = "permit.hours", APK_URL = "apk.url", EMAIL_NOTIFY = "notify.email",
+        PAYROLL_NEXT_MONTH = "payroll.count.next.month";
     /** Valori selezionabili: da mezz'ora a 8 ore, a passi di mezz'ora. */
     public static final List<BigDecimal> ALL_HOURS;
     static {
@@ -37,20 +38,27 @@ public class SettingsService {
         this.clock = clock;
     }
 
-    public record Settings(List<BigDecimal> permitHours, String apkUrl, boolean emailNotifications) {}
+    /**
+     * payrollCountFromNextMonth: false (predefinito) = nel riepilogo rimanenze le assenze si contano dal 1° del mese del cedolino,
+     * perche' il cedolino arriva in ritardo e quel mese non l'ha ancora scalato; true = dal 1° del mese successivo.
+     */
+    public record Settings(List<BigDecimal> permitHours, String apkUrl, boolean emailNotifications, boolean payrollCountFromNextMonth) {}
 
-    public record SettingsInput(List<BigDecimal> permitHours, String apkUrl, Boolean emailNotifications) {}
+    public record SettingsInput(List<BigDecimal> permitHours, String apkUrl, Boolean emailNotifications, Boolean payrollCountFromNextMonth) {}
 
     @Transactional(readOnly = true)
     public Settings get() {
         Map<String, String> m = new HashMap<>();
         repo.findAll().forEach(s -> m.put(s.getKey(), s.getValue()));
-        return new Settings(parseHours(m.get(PERMIT_HOURS)), blankToNull(m.get(APK_URL)), "true".equals(m.get(EMAIL_NOTIFY)));
+        return new Settings(parseHours(m.get(PERMIT_HOURS)), blankToNull(m.get(APK_URL)), "true".equals(m.get(EMAIL_NOTIFY)),
+            "true".equals(m.get(PAYROLL_NEXT_MONTH)));
     }
 
     public List<BigDecimal> permitHours() { return get().permitHours(); }
 
     public boolean emailNotifications() { return get().emailNotifications(); }
+
+    public boolean payrollCountFromNextMonth() { return get().payrollCountFromNextMonth(); }
 
     @Transactional
     public Settings update(User actor, SettingsInput in) {
@@ -71,8 +79,11 @@ public class SettingsService {
         put(actor, PERMIT_HOURS, String.join(",", hours.stream().map(BigDecimal::toPlainString).toList()));
         put(actor, APK_URL, apk);
         put(actor, EMAIL_NOTIFY, String.valueOf(email));
+        boolean next = in.payrollCountFromNextMonth() == null ? before.payrollCountFromNextMonth() : in.payrollCountFromNextMonth();
+        put(actor, PAYROLL_NEXT_MONTH, String.valueOf(next));
         audit.log(actor.getId(), null, "SETTINGS_UPDATED", "Ore permesso: " + String.join(", ", hours.stream().map(BigDecimal::toPlainString).toList())
-            + " · APK: " + (apk == null ? "nessuno" : "impostato") + " · Email notifiche: " + (email ? "si" : "no"));
+            + " · APK: " + (apk == null ? "nessuno" : "impostato") + " · Email notifiche: " + (email ? "si" : "no")
+            + " · Rimanenze: conteggio dal " + (next ? "mese dopo il cedolino" : "mese del cedolino"));
         return get();
     }
 

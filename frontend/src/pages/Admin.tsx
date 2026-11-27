@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Building2, CalendarHeart, ChevronLeft, ChevronRight, History, SlidersHorizontal, Wallet, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
+import { Building2, CalendarHeart, CalendarRange, ChevronLeft, ChevronRight, History, SlidersHorizontal, Wallet, Pencil, Plus, Search, Trash2, Users, UsersRound } from 'lucide-react'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
@@ -10,6 +10,7 @@ import type { AbsenceType, AreaAdmin, HolidayAdmin, Role, TeamAdmin, UserAdmin }
 import { Avatar, Button, Card, Field, inputCls, Modal, Pager, usePaged } from '../components/ui'
 import { t, t as tt } from '../lib/i18n'
 import { BalancesTab } from '../components/BalancesTab'
+import { ResidualsTab } from '../components/ResidualsTab'
 import { SettingsTab } from '../components/SettingsTab'
 
 const tabs = [
@@ -18,6 +19,7 @@ const tabs = [
   { key: 'teams', label: 'Team', icon: UsersRound },
   { key: 'holidays', label: 'Festività', icon: CalendarHeart },
   { key: 'balances', label: 'Saldi', icon: Wallet },
+  { key: 'residuals', label: 'Rimanenze', icon: CalendarRange },
   { key: 'audit', label: 'Storico', icon: History },
   { key: 'settings', label: 'Impostazioni', icon: SlidersHorizontal },
 ] as const
@@ -46,6 +48,7 @@ export function Admin() {
       {tab === 'teams' && <TeamsTab />}
       {tab === 'holidays' && <HolidaysTab />}
       {tab === 'balances' && <BalancesTab />}
+      {tab === 'residuals' && <ResidualsTab />}
       {tab === 'audit' && <AuditTab />}
       {tab === 'settings' && <SettingsTab />}
     </div>
@@ -60,7 +63,7 @@ const useOrg = () => {
 }
 
 type UserForm = Omit<UserAdmin, 'id' | 'areaName' | 'teamName'> & { id?: number; password: string }
-const emptyUser: UserForm = { username: '', email: '', fullName: '', role: 'USER', areaId: null, teamId: null, active: true, annualLeaveDays: 0, annualPermitHours: 0, password: '' }
+const emptyUser: UserForm = { username: '', email: '', fullName: '', role: 'USER', areaId: null, teamId: null, active: true, annualLeaveDays: 0, annualPermitHours: 0, employeeCode: null, password: '' }
 
 function UsersTab() {
   const { users, areas, teams } = useOrg()
@@ -95,7 +98,7 @@ function UsersTab() {
           <tbody>
             {pg.rows.map(u => (
               <tr key={u.id} className={clsx('border-t border-soft/60 hover:bg-black/[.02] dark:hover:bg-white/[.03]', !u.active && 'opacity-50')}>
-                <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar name={u.fullName} size={34} /><div><div className="font-semibold">{u.fullName}</div><div className="text-xs text-muted">{u.username} · {u.email}</div></div></div></td>
+                <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar name={u.fullName} size={34} /><div><div className="font-semibold">{u.fullName}</div><div className="text-xs text-muted">{u.username} · {u.email}{u.employeeCode && <> · {t('matr.')} {u.employeeCode}</>}</div></div></div></td>
                 <td>{roleLabel[u.role]}{!u.active && <span className="ml-2 text-xs text-rose-500">{t('disattivato')}</span>}</td>
                 <td>{u.areaName ?? '–'}{u.teamName && <span className="text-muted"> / {u.teamName}</span>}</td>
                 <td className="px-4 text-right"><button className="rounded-lg p-2 hover:bg-violet-500/10" aria-label={t('Modifica')} onClick={() => setEdit({ ...u, password: '' })}><Pencil size={15} /></button></td>
@@ -129,6 +132,9 @@ function UsersTab() {
               <select className={inputCls} value={edit.teamId ?? ''} onChange={e => set('teamId', e.target.value ? Number(e.target.value) : null)}>
                 <option value="">—</option>{teams.filter(t => t.areaId === edit.areaId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
+            </Field>
+            <Field label={t('Matricola')} hint={t('Colonna DIPENDENTE del report ratei del cedolino')}>
+              <input className={inputCls} value={edit.employeeCode ?? ''} maxLength={20} pattern="[A-Za-z0-9._-]*" onChange={e => set('employeeCode', e.target.value.trim() || null)} />
             </Field>
             <Field label={t('Stato')}>
               <select className={inputCls} value={edit.active ? '1' : '0'} onChange={e => set('active', e.target.value === '1')}>

@@ -43,6 +43,10 @@ public class User {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** Matricola (colonna DIPENDENTE del report ratei del cedolino): serve a riconoscere la persona all'import. */
+    @Column(name = "employee_code", unique = true, length = 20)
+    private String employeeCode;
+
     @Column(name = "annual_leave_days", nullable = false, precision = 5, scale = 1)
     private BigDecimal annualLeaveDays = BigDecimal.ZERO;
 

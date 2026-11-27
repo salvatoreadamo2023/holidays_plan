@@ -7,9 +7,24 @@ import { fmt, num } from '../lib/format'
 import { t } from '../lib/i18n'
 import { Button, Card, Field, inputCls, Pager, SectionTitle, usePaged } from './ui'
 
-interface BalanceRow { userId: number; username: string; fullName: string; team: string | null; referenceMonth: string | null; leaveDays: number | null; permitHours: number | null; prevLeaveDays: number | null; prevPermitHours: number | null; uploadedAt: string | null }
-interface ImportRow { row: number; username: string; fullName: string | null; leaveDays: number | null; permitHours: number | null; prevLeaveDays: number | null; prevPermitHours: number | null; error: string | null }
-interface ImportResult { referenceMonth: string; applied: boolean; valid: number; errors: number; missing: number; rows: ImportRow[] }
+export interface PayrollItemView { code: string; description: string | null; unit: 'G' | 'H'; annual: number | null; prevBalance: number | null; curBalance: number | null; totalResidual: number | null; totalProjected: number | null; deadline: string | null }
+interface BalanceRow { userId: number; username: string; fullName: string; team: string | null; referenceMonth: string | null; leaveDays: number | null; permitHours: number | null; prevLeaveDays: number | null; prevPermitHours: number | null; uploadedAt: string | null; employeeCode: string | null; items: PayrollItemView[] }
+interface ImportRow { row: number; username: string; fullName: string | null; leaveDays: number | null; permitHours: number | null; prevLeaveDays: number | null; prevPermitHours: number | null; error: string | null; employeeCode: string | null; referenceMonth: string | null; items: PayrollItemView[] | null; note: string | null }
+interface ImportResult { referenceMonth: string | null; applied: boolean; valid: number; errors: number; missing: number; rows: ImportRow[]; format: 'PAYROLL' | 'TEMPLATE' }
+
+/** Voci del cedolino separate: "Ferie 23,67 gg · ExFs-Rol 55,33 h" (saldo AP + anno). */
+export function ItemsLine({ items }: { items: PayrollItemView[] | null | undefined }) {
+  if (!items?.length) return null
+  return (
+    <div className="mt-1 flex flex-wrap gap-1.5">
+      {items.map(i => (
+        <span key={i.code} className="rounded-full border border-soft px-2 py-0.5 text-[11px]" title={`${i.code} · ${t('AP')} ${num(i.prevBalance ?? 0)} · ${t('anno')} ${num(i.curBalance ?? 0)}${i.annual != null ? ` · ${t('annuo')} ${num(i.annual)}` : ''}`}>
+          <b>{i.description || i.code}</b> {num(Number(i.totalResidual ?? 0))} {i.unit === 'H' ? 'h' : t('gg')}
+        </span>
+      ))}
+    </div>
+  )
+}
 
 export const monthLabel = (ym: string) => { const s = fmt(ym + '-01', 'MMMM yyyy'); return s.charAt(0).toUpperCase() + s.slice(1) }
 const lastMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }
@@ -27,7 +42,8 @@ export function BalancesTab() {
   const send = (apply: boolean) => {
     const fd = new FormData()
     fd.append('file', file!)
-    return api<ImportResult>(`/api/admin/balances/import?month=${month}&apply=${apply}`, { method: 'POST', body: fd })
+    const isXls = file!.name.toLowerCase().endsWith('.xls')
+    return api<ImportResult>(`/api/admin/balances/import?${isXls ? '' : `month=${month}&`}apply=${apply}`, { method: 'POST', body: fd })
   }
   const check = useMutation({ mutationFn: () => send(false), onSuccess: setPreview, onError: (e: Error) => toast.error(e.message) })
   const save = useMutation({
@@ -49,19 +65,19 @@ export function BalancesTab() {
   return (
     <div className="space-y-5">
       <Card>
-        <SectionTitle>{t('Carica i saldi residui')}</SectionTitle>
-        <p className="mb-4 text-sm text-muted">{t('Il saldo viene dalla busta paga ed è solo informativo: ogni persona vede il suo con il mese di riferimento. Non blocca le richieste di ferie o permessi.')}</p>
+        <SectionTitle>{t('Carica il cedolino (report ratei)')}</SectionTitle>
+        <p className="mb-4 text-sm text-muted">{t('Carica ogni mese il report ratei che arriva con il cedolino (Vacation accrual report, .xls): ferie e ogni tipo di permesso restano separati. Le persone sono riconosciute dalla matricola (colonna DIPENDENTE); se manca, dal nome, e la matricola viene salvata. I saldi li vede solo l\'admin e servono al riepilogo Rimanenze.')}</p>
         <ol className="mb-5 space-y-1.5 text-sm">
-          <li><b>1.</b> {t("Scarica l'Excel tipo: ha già una riga per ogni persona.")} <button onClick={getTemplate} className="ml-1 inline-flex items-center gap-1 font-semibold text-violet-600 hover:underline dark:text-violet-300"><Download size={14} />{t('Scarica Excel tipo')}</button></li>
-          <li><b>2.</b> {t('Compila ferie residue (giorni) e permessi residui (ore) dalla busta paga.')}</li>
-          <li><b>3.</b> {t('Scegli il mese di riferimento, carica il file e controlla l\'anteprima prima di confermare.')}</li>
+          <li><b>1.</b> {t('Carica il file così com\'è: il mese lo leggo dalle colonne MESE e ANNO.')}</li>
+          <li><b>2.</b> {t('Controlla l\'anteprima e conferma.')}</li>
+          <li className="text-muted"><b>{t('In alternativa')}:</b> {t("l'Excel tipo con una riga per persona, scegliendo il mese.")} <button onClick={getTemplate} className="ml-1 inline-flex items-center gap-1 font-semibold text-violet-600 hover:underline dark:text-violet-300"><Download size={14} />{t('Scarica Excel tipo')}</button></li>
         </ol>
         <div className="grid gap-4 sm:grid-cols-[200px_1fr_auto] sm:items-end">
-          <Field label={t('Saldo residuo al mese')}>
+          <Field label={t('Mese (solo per l\'Excel tipo)')}>
             <input type="month" className={inputCls} value={month} max={thisMonth()} onChange={e => { setMonth(e.target.value); setPreview(null) }} />
           </Field>
-          <Field label={t('File Excel (.xlsx)')}>
-            <input ref={input} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className={inputCls + ' file:mr-3 file:rounded-lg file:border-0 file:bg-violet-500/10 file:px-3 file:py-1 file:text-sm file:font-semibold file:text-violet-600'}
+          <Field label={t('File Excel (.xls o .xlsx)')}>
+            <input ref={input} type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className={inputCls + ' file:mr-3 file:rounded-lg file:border-0 file:bg-violet-500/10 file:px-3 file:py-1 file:text-sm file:font-semibold file:text-violet-600'}
               onChange={e => { setFile(e.target.files?.[0] ?? null); setPreview(null) }} />
           </Field>
           <Button variant="primary" disabled={!file || !month || check.isPending} onClick={() => check.mutate()}><FileSpreadsheet size={16} />{t('Controlla')}</Button>
@@ -71,7 +87,7 @@ export function BalancesTab() {
       {preview && (
         <Card>
           <SectionTitle action={<Button variant="primary" disabled={!preview.valid || save.isPending} onClick={() => save.mutate()}><Upload size={16} />{t('Conferma e carica ({n})', { n: preview.valid })}</Button>}>
-            {t('Anteprima · saldo a {m}', { m: monthLabel(preview.referenceMonth) })}
+            {preview.referenceMonth ? t('Anteprima · saldo a {m}', { m: monthLabel(preview.referenceMonth) }) : t('Anteprima')}
           </SectionTitle>
           <div className="mb-3 flex flex-wrap gap-2 text-sm">
             <span className="rounded-full bg-emerald-500/15 px-3 py-1 font-semibold text-emerald-700 dark:text-emerald-300">{t('{n} righe valide', { n: preview.valid })}</span>
@@ -81,14 +97,14 @@ export function BalancesTab() {
           <div className="overflow-auto scrollbar-thin">
             <table className="w-full min-w-[560px] text-sm">
               <thead className="sticky top-0 bg-[var(--surface-strong)] text-left text-xs uppercase tracking-wide text-muted">
-                <tr><th className="py-2 pr-3">{t('Riga')}</th><th className="pr-3">Username</th><th className="pr-3">{t('Persona')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th><th className="pr-3 text-right">{t('Ferie AP')}</th><th className="pr-3 text-right">{t('Permessi AP')}</th><th></th></tr>
+                <tr><th className="py-2 pr-3">{t('Riga')}</th><th className="pr-3">{preview.format === 'PAYROLL' ? t('Matricola') : 'Username'}</th><th className="pr-3">{t('Persona')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th><th className="pr-3 text-right">{t('Ferie AP')}</th><th className="pr-3 text-right">{t('Permessi AP')}</th><th></th></tr>
               </thead>
               <tbody>
                 {ppg.rows.map(r => (
                   <tr key={r.row} className="border-t border-soft">
                     <td className="py-2 pr-3 text-muted">{r.row}</td>
-                    <td className="pr-3 font-mono text-xs">{r.username}</td>
-                    <td className="pr-3">{r.fullName ?? '—'}</td>
+                    <td className="pr-3 font-mono text-xs">{preview.format === 'PAYROLL' ? r.employeeCode : r.username}</td>
+                    <td className="pr-3">{r.fullName ?? '—'}<ItemsLine items={r.items} />{r.note && <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">{r.note}</div>}</td>
                     <td className="pr-3 text-right">{r.leaveDays == null ? '—' : num(r.leaveDays)}</td>
                     <td className="pr-3 text-right">{r.permitHours == null ? '—' : num(r.permitHours)}</td>
                     <td className="pr-3 text-right">{r.prevLeaveDays == null ? '—' : num(r.prevLeaveDays)}</td>
@@ -112,12 +128,12 @@ export function BalancesTab() {
         <div className="overflow-auto scrollbar-thin">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-muted">
-              <tr><th className="py-2 pr-3">{t('Persona')}</th><th className="pr-3">Team</th><th className="pr-3">{t('Saldo al mese')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th><th className="pr-3 text-right">{t('Ferie AP')}</th><th className="pr-3 text-right">{t('Permessi AP')}</th></tr>
+              <tr><th className="py-2 pr-3">{t('Persona')}</th><th className="pr-3">Team</th><th className="pr-3">{t('Cedolino')}</th><th className="pr-3 text-right">{t('Ferie (gg)')}</th><th className="pr-3 text-right">{t('Permessi (h)')}</th><th className="pr-3 text-right">{t('Ferie AP')}</th><th className="pr-3 text-right">{t('Permessi AP')}</th></tr>
             </thead>
             <tbody>
               {pg.rows.map(b => (
                 <tr key={b.userId} className="border-t border-soft">
-                  <td className="py-2 pr-3">{b.fullName}</td>
+                  <td className="py-2 pr-3">{b.fullName}{b.employeeCode && <span className="ml-1 text-xs text-muted">· {t('matr.')} {b.employeeCode}</span>}<ItemsLine items={b.items} /></td>
                   <td className="pr-3 text-muted">{b.team ?? '—'}</td>
                   <td className="pr-3">{b.referenceMonth ? monthLabel(b.referenceMonth) : <span className="text-muted">{t('Non caricato')}</span>}</td>
                   <td className="pr-3 text-right">{b.leaveDays == null ? '—' : num(b.leaveDays)}</td>

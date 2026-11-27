@@ -76,6 +76,12 @@
 			<artifactId>fastexcel</artifactId>
 			<version>0.18.4</version>
 		</dependency>
+		<!-- Solo HSSF: legge il report ratei del cedolino, che arriva in formato .xls (Excel 97-2003). -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi</artifactId>
+			<version>5.4.1</version>
+		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>

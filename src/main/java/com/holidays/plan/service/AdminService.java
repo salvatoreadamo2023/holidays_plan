@@ -56,6 +56,15 @@ public class AdminService {
         u.setTeam(team);
     }
 
+    /** Matricola facoltativa e unica; "000080" e "80" sono la stessa matricola. */
+    private void applyEmployeeCode(User u, String raw) {
+        String code = PayrollImport.normalizeCode(raw);
+        if (code != null) users.findByEmployeeCode(code).filter(o -> !Objects.equals(o.getId(), u.getId())).ifPresent(o -> {
+            throw ApiException.conflict("Matricola gia' assegnata a " + o.getFullName());
+        });
+        u.setEmployeeCode(code);
+    }
+
     public UserAdminView createUser(User actor, UserCreate in) {
         if (users.existsByUsernameIgnoreCase(in.username())) throw ApiException.conflict("Username gia' in uso");
         if (users.existsByEmailIgnoreCase(in.email())) throw ApiException.conflict("Email gia' in uso");
@@ -68,6 +77,7 @@ public class AdminService {
         u.setAnnualLeaveDays(in.annualLeaveDays() == null ? BigDecimal.ZERO : in.annualLeaveDays());
         u.setAnnualPermitHours(in.annualPermitHours() == null ? BigDecimal.ZERO : in.annualPermitHours());
         applyOrg(u, in.role(), in.areaId(), in.teamId());
+        applyEmployeeCode(u, in.employeeCode());
         u = users.save(u);
         audit.log(actor.getId(), null, "USER_CREATED", u.getUsername() + " " + u.getRole());
         return UserAdminView.of(u);
@@ -85,6 +95,7 @@ public class AdminService {
         if (in.annualLeaveDays() != null) u.setAnnualLeaveDays(in.annualLeaveDays());
         if (in.annualPermitHours() != null) u.setAnnualPermitHours(in.annualPermitHours());
         applyOrg(u, in.role(), in.areaId(), in.teamId());
+        applyEmployeeCode(u, in.employeeCode());
         if (in.newPassword() != null && !in.newPassword().isBlank()) {
             u.setPasswordHash(encoder.encode(in.newPassword()));
             u.setMustChangePassword(true);

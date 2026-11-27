@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Clock, Mail, Smartphone } from 'lucide-react'
+import { CalendarRange, Clock, Mail, Smartphone } from 'lucide-react'
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
@@ -9,7 +9,7 @@ import { t } from '../lib/i18n'
 import { ALL_HOURS } from '../lib/settings'
 import { Button, Card, inputCls } from './ui'
 
-interface AdminSettings { permitHours: number[]; apkUrl: string | null; emailNotifications: boolean }
+interface AdminSettings { permitHours: number[]; apkUrl: string | null; emailNotifications: boolean; payrollCountFromNextMonth: boolean }
 
 /** Impostazioni generali: durate di permesso consentite, link APK, email di notifica. */
 export function SettingsTab() {
@@ -18,11 +18,12 @@ export function SettingsTab() {
   const [hours, setHours] = useState<number[]>([])
   const [apk, setApk] = useState('')
   const [email, setEmail] = useState(false)
+  const [nextMonth, setNextMonth] = useState(false)
   useEffect(() => {
-    if (q.data) { setHours(q.data.permitHours.map(Number)); setApk(q.data.apkUrl ?? ''); setEmail(q.data.emailNotifications) }
+    if (q.data) { setHours(q.data.permitHours.map(Number)); setApk(q.data.apkUrl ?? ''); setEmail(q.data.emailNotifications); setNextMonth(q.data.payrollCountFromNextMonth) }
   }, [q.data])
   const save = useMutation({
-    mutationFn: () => api<AdminSettings>('/api/admin/settings', { method: 'PUT', json: { permitHours: hours, apkUrl: apk.trim(), emailNotifications: email } }),
+    mutationFn: () => api<AdminSettings>('/api/admin/settings', { method: 'PUT', json: { permitHours: hours, apkUrl: apk.trim(), emailNotifications: email, payrollCountFromNextMonth: nextMonth } }),
     onSuccess: () => { toast.success(t('Impostazioni salvate')); qc.invalidateQueries({ queryKey: ['admin', 'settings'] }); qc.invalidateQueries({ queryKey: ['settings'] }) },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -66,6 +67,19 @@ export function SettingsTab() {
           <input type="checkbox" className="mt-1 h-4 w-4 accent-violet-600" checked={email} onChange={e => setEmail(e.target.checked)} />
           <span className="text-sm">{t('Invia anche un\'email per ogni notifica (nuove richieste, decisioni, rettifiche, annullamenti). La campanella del sito e le push dell\'app funzionano comunque.')}
             <span className="mt-1 block text-xs text-muted">{t('Serve il server email configurato su Render (Amazon SES): senza, le email non partono.')}</span></span>
+        </label>
+      </Card>
+
+      <Card>
+        <div className="mb-1 flex items-center gap-2 font-display text-lg font-semibold"><CalendarRange size={18} className="text-fuchsia-500" />{t('Rimanenze: da quando contare')}</div>
+        <p className="mb-3 text-sm text-muted">{t('Il cedolino arriva in ritardo: quello di febbraio contiene le assenze fino a gennaio. Per questo nel riepilogo le assenze si contano dal 1° del mese del cedolino.')}</p>
+        <label className="flex cursor-pointer items-start gap-3">
+          <input type="radio" name="payroll-from" className="mt-1 h-4 w-4 accent-violet-600" checked={!nextMonth} onChange={() => setNextMonth(false)} />
+          <span className="text-sm">{t('Dal mese del cedolino (consigliato)')}<span className="block text-xs text-muted">{t('Cedolino di febbraio: si conta dal 1° febbraio.')}</span></span>
+        </label>
+        <label className="mt-2 flex cursor-pointer items-start gap-3">
+          <input type="radio" name="payroll-from" className="mt-1 h-4 w-4 accent-violet-600" checked={nextMonth} onChange={() => setNextMonth(true)} />
+          <span className="text-sm">{t('Dal mese dopo il cedolino')}<span className="block text-xs text-muted">{t('Cedolino di febbraio: si conta dal 1° marzo.')}</span></span>
         </label>
       </Card>
 

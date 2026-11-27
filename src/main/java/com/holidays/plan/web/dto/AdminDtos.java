@@ -12,12 +12,13 @@ public final class AdminDtos {
 
     public record UserAdminView(Long id, String username, String email, String fullName, Role role,
                                 Long areaId, String areaName, Long teamId, String teamName, boolean active,
-                                BigDecimal annualLeaveDays, BigDecimal annualPermitHours, boolean mustChangePassword) {
+                                BigDecimal annualLeaveDays, BigDecimal annualPermitHours, boolean mustChangePassword,
+                                String employeeCode) {
         public static UserAdminView of(User u) {
             return new UserAdminView(u.getId(), u.getUsername(), u.getEmail(), u.getFullName(), u.getRole(),
                 u.areaId(), u.getArea() == null ? null : u.getArea().getName(),
                 u.teamId(), u.getTeam() == null ? null : u.getTeam().getName(), u.isActive(),
-                u.getAnnualLeaveDays(), u.getAnnualPermitHours(), u.isMustChangePassword());
+                u.getAnnualLeaveDays(), u.getAnnualPermitHours(), u.isMustChangePassword(), u.getEmployeeCode());
         }
     }
 
@@ -30,7 +31,8 @@ public final class AdminDtos {
         Long areaId,
         Long teamId,
         @DecimalMin("0") @DecimalMax("60") BigDecimal annualLeaveDays,
-        @DecimalMin("0") @DecimalMax("400") BigDecimal annualPermitHours) {}
+        @DecimalMin("0") @DecimalMax("400") BigDecimal annualPermitHours,
+        @Size(max = 20) @Pattern(regexp = "[A-Za-z0-9._-]*") String employeeCode) {}
 
     public record UserUpdate(
         @NotBlank @Email @Size(max = 180) String email,
@@ -41,7 +43,8 @@ public final class AdminDtos {
         boolean active,
         @DecimalMin("0") @DecimalMax("60") BigDecimal annualLeaveDays,
         @DecimalMin("0") @DecimalMax("400") BigDecimal annualPermitHours,
-        @Size(min = 10, max = 200) String newPassword) {}
+        @Size(min = 10, max = 200) String newPassword,
+        @Size(max = 20) @Pattern(regexp = "[A-Za-z0-9._-]*") String employeeCode) {}
 
     public record AreaInput(@NotBlank @Size(max = 100) String name, Long managerId) {}
 
